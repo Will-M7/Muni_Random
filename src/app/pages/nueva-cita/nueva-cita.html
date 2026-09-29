@@ -1,0 +1,257 @@
+<main class="request-page">
+  <header class="page-header">
+    <div class="breadcrumb">
+      <a routerLink="/inicio">Municipio</a>
+      <span>/</span>
+      <a routerLink="/solicitudes">Solicitudes</a>
+      <span>/</span>
+      <strong>{{ esModoEdicion ? 'Editar solicitud' : 'Nueva solicitud' }}</strong>
+    </div>
+
+    <div class="header-main">
+      <div>
+        <span class="eyebrow">MUNICIPALIDAD DISTRITAL DE SAN MIGUEL · REGISTRO OFICIAL</span>
+        <h1>{{ esModoEdicion ? 'Editar Solicitud ' + codigoEdicion : 'Solicitar Verificación Domiciliaria' }}</h1>
+        <p class="subtitle">
+          {{ esModoEdicion ? 'Modifica los datos del expediente, documentación o ubicación.' : 'Ingresa la información del ciudadano, adjunta su documentación y registra la ubicación.' }}
+        </p>
+      </div>
+
+      <div class="header-actions">
+        <button type="button" class="btn-ghost" (click)="cancelar()">
+          Cancelar y volver
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ALERTA DE MENSAJES -->
+  <div class="alert alert-error" *ngIf="mensajeError">
+    <p>{{ mensajeError }}</p>
+    <button class="btn-close" (click)="mensajeError = ''" aria-label="Cerrar mensaje">Cerrar</button>
+  </div>
+
+  <div class="alert alert-success" *ngIf="mensajeExito">
+    <p>{{ mensajeExito }}</p>
+  </div>
+
+  <!-- CONTENIDO PRINCIPAL: FORMULARIO + ASIDE CITAS -->
+  <div class="form-layout">
+    <!-- COLUMNA FORMULARIO -->
+    <form class="main-form" (ngSubmit)="guardarSolicitud()">
+      <!-- SECCIÓN 1: DATOS DEL SOLICITANTE -->
+      <section class="form-section">
+        <div class="section-badge">1</div>
+        <div class="section-content">
+          <h2>Datos del ciudadano</h2>
+          <p class="section-desc">Identifica a la persona solicitante y valida sus datos oficiales.</p>
+
+          <div class="form-grid">
+            <div class="form-group col-4">
+              <label for="dni">DNI <span class="req">*</span></label>
+              <div class="dni-field">
+                <input
+                  id="dni"
+                  type="text"
+                  maxlength="8"
+                  [(ngModel)]="datos.dni"
+                  (input)="onDniInput()"
+                  name="dni"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="8 dígitos"
+                  required
+                />
+                <span class="dni-spinner" *ngIf="cargandoDni" aria-label="Consultando RENIEC"></span>
+              </div>
+              <small class="dni-hint" [class.success]="dniConsultadoExito" [class.loading]="cargandoDni" *ngIf="dniMensaje" role="status">
+                {{ dniMensaje }}
+              </small>
+            </div>
+
+            <div class="form-group col-4">
+              <label for="nombres">Nombres <span class="req">*</span></label>
+              <input
+                id="nombres"
+                type="text"
+                [(ngModel)]="datos.nombres"
+                name="nombres"
+                placeholder="Nombres completos"
+                [readonly]="dniConsultadoExito"
+                required
+              />
+            </div>
+
+            <div class="form-group col-4">
+              <label for="apellidos">Apellidos <span class="req">*</span></label>
+              <input
+                id="apellidos"
+                type="text"
+                [(ngModel)]="datos.apellidos"
+                name="apellidos"
+                placeholder="Apellidos paterno y materno"
+                [readonly]="dniConsultadoExito"
+                required
+              />
+            </div>
+
+            <div class="form-group col-4">
+              <label for="telefono">Teléfono / Celular <span class="req">*</span></label>
+              <input
+                id="telefono"
+                type="tel"
+                [(ngModel)]="datos.telefono"
+                name="telefono"
+                placeholder="Ej. 987 654 321"
+                required
+              />
+            </div>
+
+            <div class="form-group col-8">
+              <label for="direccion">Dirección exacta en San Miguel <span class="req">*</span></label>
+              <input
+                id="direccion"
+                type="text"
+                [(ngModel)]="datos.direccion"
+                (ngModelChange)="ubicacionSeleccionadaEnMapa = false"
+                name="direccion"
+                placeholder="Av., Jr., Calle, número, urbanización o departamento"
+                required
+              />
+            </div>
+
+            <div class="form-group col-12">
+              <label for="referencia">Referencia de ubicación de la vivienda</label>
+              <input
+                id="referencia"
+                type="text"
+                [(ngModel)]="datos.referencia"
+                name="referencia"
+                placeholder="Ej. Altura cdra. 12 de La Marina, frente a parque o esquina con farmacia"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 2: DOCUMENTO PDF -->
+      <section class="form-section">
+        <div class="section-badge">2</div>
+        <div class="section-content">
+          <h2>Documento de sustento</h2>
+          <p class="section-desc">Adjunta en formato PDF el DNI, recibo de servicio público o contrato de arrendamiento.</p>
+
+          <!-- Si ya hay documento cargado -->
+          <div class="doc-uploaded-card" *ngIf="datos.documento; else uploadPrompt">
+            <div class="doc-icon">PDF</div>
+            <div class="doc-meta">
+              <div class="doc-status-pill">Documento PDF cargado</div>
+              <strong class="doc-name">{{ datos.documento }}</strong>
+              <small class="doc-size">{{ datos.documentoTamano || 'Formato PDF verificado' }}</small>
+            </div>
+            <div class="doc-actions">
+              <label class="btn-replace">
+                Reemplazar PDF
+                <input
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  (change)="onFileSelected($event)"
+                  style="display: none;"
+                />
+              </label>
+              <button
+                type="button"
+                class="btn-delete"
+                (click)="eliminarDocumento()"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+
+          <!-- Si aún no se ha subido -->
+          <ng-template #uploadPrompt>
+            <label class="drop-zone" [class.error-zone]="archivoInvalido">
+              <input
+                type="file"
+                accept=".pdf,application/pdf"
+                (change)="onFileSelected($event)"
+                class="file-input-hidden"
+              />
+              <span class="upload-icon" aria-hidden="true">PDF</span>
+              <strong>Seleccionar archivo PDF</strong>
+              <p>Haz clic aquí para examinar tus archivos. Solo se admiten archivos .pdf</p>
+              <span class="badge-pdf">Formato requerido: .PDF</span>
+            </label>
+          </ng-template>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 3: UBICACIÓN EXACTA EN MAPA -->
+      <section class="form-section">
+        <div class="section-badge">3</div>
+        <div class="section-content">
+          <h2>Ubicación del domicilio</h2>
+          <p class="section-desc">
+            Busca la dirección en Google Maps. Después marca el predio para asociar la ubicación al expediente.
+          </p>
+
+          <div class="map-picker-card">
+            <div class="map-icon-box">Mapa</div>
+            <div class="map-details">
+              <strong>
+                {{ ubicacionSeleccionadaEnMapa ? 'Ubicación confirmada' : 'Ubicación pendiente de confirmación' }}
+              </strong>
+              <p class="coords-text">
+                Coordenadas: <code>{{ datos.ubicacion }}</code>
+              </p>
+              <small class="map-note-text">
+                {{ ubicacionSeleccionadaEnMapa ? 'Coordenadas confirmadas para el expediente.' : 'Google Maps abrirá la dirección escrita arriba; luego marca el predio en el selector.' }}
+              </small>
+            </div>
+            <button
+              type="button"
+              class="btn-map-action"
+              (click)="abrirMapa()"
+            >
+              Buscar dirección en Google Maps
+            </button>
+          </div>
+          <div class="location-confirm-row"><button type="button" class="btn-confirm-location" (click)="abrirSelectorCoordenadas()">{{ ubicacionSeleccionadaEnMapa ? 'Cambiar punto del predio' : 'Marcar punto del predio' }}</button><small>La búsqueda de Google Maps no comunica coordenadas a esta aplicación. Selecciona el punto en el mapa del expediente para completar el registro.</small></div>
+        </div>
+      </section>
+
+      <section class="form-section"><div class="section-badge">4</div><div class="section-content"><h2>Observaciones</h2><textarea id="observaciones" rows="3" [(ngModel)]="datos.observaciones" name="observaciones" placeholder="Información adicional sobre la solicitud..."></textarea></div></section>
+
+      <section class="form-section">
+        <div class="section-badge">5</div>
+        <div class="section-content">
+          <h2>Programación de fiscalización</h2>
+          <p class="section-desc">Define la fecha y hora previstas para la visita de fiscalización.</p>
+          <div class="form-grid">
+            <div class="form-group col-6"><label for="fechaFiscalizacion">Fecha de fiscalización <span class="req">*</span></label><input id="fechaFiscalizacion" type="date" [ngModel]="datos.fechaFiscalizacion" (ngModelChange)="onFechaFiscalizacionChange($event)" name="fechaFiscalizacion" required /></div>
+            <div class="form-group col-6"><label for="horaFiscalizacion">Hora de fiscalización <span class="req">*</span></label><input id="horaFiscalizacion" type="time" [ngModel]="datos.horaFiscalizacion" (ngModelChange)="onHoraFiscalizacionChange($event)" name="horaFiscalizacion" required /><small class="schedule-conflict" *ngIf="horarioOcupado">Ya existe una fiscalización programada a esta hora.</small></div>
+            <div class="form-group col-12"><label for="fiscalizadorId">Fiscalizador asignado <span class="req">*</span></label><select id="fiscalizadorId" [(ngModel)]="datos.fiscalizadorId" (ngModelChange)="onHoraFiscalizacionChange(datos.horaFiscalizacion)" name="fiscalizadorId" required><option value="">Seleccionar fiscalizador</option><option *ngFor="let f of fiscalizadores" [value]="f.id">{{ f.nombre }} · {{ f.zona }}</option></select></div>
+          </div>
+          <div class="day-schedule" *ngIf="datos.fechaFiscalizacion">
+            <div class="day-schedule-head"><div><h3>Programación del día</h3><p>{{ datos.fechaFiscalizacion | date:'dd/MM/yyyy' }}</p></div><strong>{{ cargandoAgenda ? 'Cargando...' : agendaDelDia.length + ' fiscalizaciones programadas' }}</strong></div>
+            <p class="schedule-error" *ngIf="agendaError">{{ agendaError }}</p>
+            <p class="schedule-empty" *ngIf="!cargandoAgenda && !agendaError && !agendaDelDia.length">No hay fiscalizaciones programadas para esta fecha.</p>
+            <ul class="day-schedule-list" *ngIf="agendaDelDia.length"><li *ngFor="let item of agendaDelDia"><time>{{ item.horaFiscalizacion | slice:0:5 }}</time><span><strong>{{ item.codigo }}</strong> {{ item.ciudadano }}</span><small>{{ item.fiscalizador }} · {{ item.estado }}</small></li></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- BOTONES FINALES DE FORMULARIO -->
+      <div class="form-footer-actions">
+        <button type="button" class="btn-ghost" (click)="cancelar()">
+          Cancelar
+        </button>
+        <button type="submit" class="btn-primary-lg" [disabled]="guardando">
+          {{ esModoEdicion ? 'Guardar cambios de la solicitud' : 'Registrar solicitud' }}
+        </button>
+      </div>
+    </form>
+
+  </div>
+</main>

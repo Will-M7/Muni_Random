@@ -1,0 +1,15 @@
+.day-schedule { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--municipal-border); background: var(--municipal-background-deep); }
+.day-schedule-head { display: flex; justify-content: space-between; align-items: end; gap: 12px; border-bottom: 1px solid var(--municipal-border); padding-bottom: 10px; }
+.day-schedule-head h3 { margin: 0; color: var(--municipal-primary-deep); font-size: 15px; }
+.day-schedule-head p { margin: 3px 0 0; color: var(--municipal-muted); font-size: 11px; }
+.day-schedule-head > strong { color: var(--municipal-primary-dark); font-size: 11px; }
+.day-schedule-list { list-style: none; padding: 0; margin: 0; }
+.day-schedule-list li { display: grid; grid-template-columns: 58px 1fr auto; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--municipal-border); font-size: 12px; }
+.day-schedule-list li:last-child { border-bottom: 0; }
+.day-schedule-list time { color: var(--municipal-primary-deep); font-size: 15px; font-weight: 800; }
+.day-schedule-list span { color: var(--municipal-text); }
+.day-schedule-list span strong { margin-right: 7px; color: var(--municipal-primary-dark); font-size: 10px; }
+.day-schedule-list small { color: var(--municipal-muted); font-size: 10px; }
+.schedule-empty, .schedule-error { margin: 13px 0 0; color: var(--municipal-muted); font-size: 12px; }
+.schedule-error, .schedule-conflict { color: var(--municipal-danger); }
+.schedule-conflict { font-size: 11px; }

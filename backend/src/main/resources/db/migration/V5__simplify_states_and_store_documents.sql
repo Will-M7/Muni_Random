@@ -1,0 +1,13 @@
+ALTER TABLE solicitud ADD COLUMN documento_nombre_interno VARCHAR(120) NULL;
+ALTER TABLE solicitud ADD COLUMN documento_content_type VARCHAR(80) NULL;
+ALTER TABLE solicitud ADD COLUMN documento_ruta VARCHAR(255) NULL;
+ALTER TABLE solicitud ADD COLUMN documento_fecha_subida DATETIME NULL;
+
+UPDATE solicitud SET estado = CASE
+    WHEN estado IN ('VERIFICADA', 'FINALIZADA', 'VERIFICADO') THEN 'VERIFICADO'
+    WHEN estado IN ('OBSERVADA', 'NO_UBICADA', 'CANCELADA') THEN 'OBSERVADA'
+    ELSE 'EN_ESPERA' END;
+UPDATE solicitud_historial SET estado = CASE
+    WHEN estado IN ('VERIFICADA', 'FINALIZADA', 'VERIFICADO') THEN 'VERIFICADO'
+    WHEN estado IN ('OBSERVADA', 'NO_UBICADA', 'CANCELADA') THEN 'OBSERVADA'
+    ELSE 'EN_ESPERA' END;

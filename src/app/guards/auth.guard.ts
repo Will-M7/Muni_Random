@@ -1,0 +1,3 @@
+import { CanActivateFn, Router } from '@angular/router'; import { inject } from '@angular/core'; import { AuthService } from '../services/auth.service'; import { Rol } from '../models/solicitud.model';
+export const authGuard:CanActivateFn=()=>{const auth=inject(AuthService);return auth.isAuthenticated()?true:inject(Router).createUrlTree(['/login']);};
+export const roleGuard:CanActivateFn=(route)=>{const auth=inject(AuthService);if(!auth.isAuthenticated())return inject(Router).createUrlTree(['/login']);const roles=route.data['roles'] as Rol[]|undefined;return !roles||roles.includes(auth.session?.rol as Rol)?true:inject(Router).createUrlTree(['/perfil']);};

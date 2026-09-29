@@ -1,0 +1,41 @@
+<main class="mapa-container">
+  <header class="mapa-header">
+    <div class="mapa-title">
+      <span class="eyebrow">MUNICIPALIDAD DISTRITAL DE SAN MIGUEL · GEORREFERENCIACIÓN</span>
+      <h1>Seleccionar ubicación de la vivienda</h1>
+      <p class="mapa-subtitle">
+        {{ solicitanteNombre ? 'Fijando ubicación para: ' + solicitanteNombre + ' (' + direccionPredio + ')' : 'Busca una dirección o selecciona el punto exacto del domicilio.' }}
+      </p>
+    </div>
+
+    <div class="mapa-actions">
+      <button type="button" class="btn-back" (click)="volver()">
+        Volver a la solicitud
+      </button>
+      <button type="button" class="btn-save-loc" (click)="guardarUbicacion()">
+        Confirmar ubicación
+      </button>
+    </div>
+  </header>
+
+  <p class="mapa-message" *ngIf="mapaMensaje" role="alert">{{ mapaMensaje }}</p>
+
+  <section class="map-search"><form (ngSubmit)="buscarUbicacion()"><label for="map-search-input">Buscar dirección o lugar</label><div><input id="map-search-input" [(ngModel)]="terminoBusqueda" name="terminoBusqueda" placeholder="Ej. Jr. Federico Gallese 370, San Miguel" /><button type="submit" [disabled]="buscando">{{ buscando ? 'Buscando...' : 'Buscar' }}</button></div></form><ul *ngIf="resultadosBusqueda.length"><li *ngFor="let resultado of resultadosBusqueda"><button type="button" (click)="seleccionarResultado(resultado)">{{ resultado.display_name }}</button></li></ul></section>
+
+  <!-- BARRA DE COORDENADAS -->
+  <div class="coords-bar">
+    <div class="coords-info">
+      <span class="coords-dot" [class.active]="coordenadasSeleccionadas">●</span>
+      <strong>
+        {{ coordenadasSeleccionadas ? 'Punto geográfico fijado:' : 'Selecciona un punto en el mapa:' }}
+      </strong>
+      <code>Latitud: {{ latitudActual.toFixed(6) }} | Longitud: {{ longitudActual.toFixed(6) }}</code>
+    </div>
+    <span class="distrito-badge">Distrito de San Miguel · Lima</span>
+  </div>
+
+  <!-- CONTENEDOR LEAFLET -->
+  <div class="map-wrapper">
+    <div id="mapa"></div>
+  </div>
+</main>

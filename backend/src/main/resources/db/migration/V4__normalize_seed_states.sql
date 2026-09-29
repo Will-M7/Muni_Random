@@ -1,0 +1,4 @@
+UPDATE solicitud SET estado = 'EN_FISCALIZACION' WHERE estado = 'EN FISCALIZACIÓN';
+UPDATE solicitud SET estado = 'PENDIENTE_DE_REVISION' WHERE estado = 'PENDIENTE DE REVISIÓN';
+UPDATE solicitud SET estado = 'LISTA_PARA_AGENDAR' WHERE estado = 'LISTA PARA AGENDAR';
+UPDATE solicitud_historial SET estado = 'EN_FISCALIZACION' WHERE estado = 'EN FISCALIZACIÓN';

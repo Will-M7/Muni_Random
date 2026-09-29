@@ -1,0 +1,40 @@
+# Angular / Node
+node_modules/
+dist/
+.angular/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Spring Boot / Java
+target/
+build/
+.gradle/
+*.class
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Secretos / configuración local
+.env
+.env.*
+!.env.example
+
+# Temporales
+*.tmp
+*.swp
+*~
+
+# Uploads locales si existen
+uploads/
+.npm-cache/

@@ -1,0 +1,26 @@
+<main class="login-viewport">
+  <section class="login-shell" aria-labelledby="login-title">
+    <aside class="login-identity">
+      <div class="identity-topline">MUNICIPALIDAD DISTRITAL DE SAN MIGUEL</div>
+      <img src="/assets/imagenes/logo_muni.jpeg" alt="Logo de la Municipalidad Distrital de San Miguel" class="login-logo">
+      <div class="identity-copy">
+        <p class="identity-kicker">PLATAFORMA INSTITUCIONAL</p>
+        <h1>Verificación<br><span>domiciliaria</span></h1>
+        <p>Registro y seguimiento de solicitudes para la atención municipal.</p>
+      </div>
+      <div class="identity-rule"></div><small>Acceso para personal autorizado</small>
+    </aside>
+    <section class="login-form-container">
+      <header class="login-heading"><p class="eyebrow">PORTAL DE GESTIÓN</p><h2 id="login-title">Iniciar sesión</h2><p>Ingresa tus credenciales institucionales para continuar.</p></header>
+      <div class="alert alert-error" *ngIf="mensajeError" role="alert"><p>{{ mensajeError }}</p></div>
+      <div class="alert alert-success" *ngIf="mensajeExito" role="status"><p>{{ mensajeExito }}</p></div>
+      <form class="login-fields" (ngSubmit)="iniciarSesion()">
+        <div class="form-group"><label for="usuario">Usuario o correo institucional</label><input id="usuario" type="text" [(ngModel)]="usuario" name="usuario" placeholder="Ingresa tu usuario" required autocomplete="username"></div>
+        <div class="form-group"><div class="label-row"><label for="password">Contraseña</label><button type="button" class="btn-toggle-pass" (click)="mostrarPassword = !mostrarPassword">{{ mostrarPassword ? 'Ocultar' : 'Mostrar' }}</button></div><input id="password" [type]="mostrarPassword ? 'text' : 'password'" [(ngModel)]="password" name="password" placeholder="Ingresa tu contraseña" required autocomplete="current-password"></div>
+        <label class="remember-box"><input type="checkbox" [(ngModel)]="recordarSesion" name="recordar"><span>Recordar mi sesión en este equipo</span></label>
+        <button type="submit" class="btn-submit-login" [disabled]="cargando">{{ cargando ? 'Verificando credenciales…' : 'Ingresar al sistema' }}</button>
+      </form>
+      <p class="form-footer-note">Sistema seguro · Municipalidad Distrital de San Miguel</p>
+    </section>
+  </section>
+</main>

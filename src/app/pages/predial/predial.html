@@ -1,0 +1,63 @@
+<div class="contenedor">
+
+  <div class="encabezado">
+    <h1>Gestión Predial</h1>
+    <p>Municipalidad Distrital de San Miguel</p>
+  </div>
+
+  <div class="formulario">
+
+    <h2>Datos de la vivienda</h2>
+
+    <label>Dirección del predio</label>
+    <input
+      type="text"
+      placeholder="Ingrese la dirección de su vivienda" [(ngModel)]="direccion">
+
+    <label>Referencia</label>
+    <input
+      type="text"
+      placeholder="Ejemplo: cerca al parque" [(ngModel)]="referencia">
+
+    <label>Tipo de vivienda</label>
+
+    <select [(ngModel)]="tipoVivienda" name="tipoVivienda">
+      <option value="">Seleccione</option>
+      <option>Casa</option>
+      <option>Departamento</option>
+      <option>Local</option>
+      <option>Otro</option>
+    </select>
+
+    <label>Código predial</label>
+
+    <input
+      type="text"
+      placeholder="Ingrese el código predial" [(ngModel)]="codigoPredial">
+
+    <h2>Ubicación de la vivienda</h2>
+
+    <div class="ubicacion">
+      <div class="icono">Mapa</div>
+
+      <div>
+        <h3>Ubicar mi vivienda</h3>
+        <p>
+          Seleccione la ubicación de su vivienda
+          para facilitar una futura inspección municipal.
+        </p>
+
+        <button routerLink="/mapa">
+          Seleccionar ubicación en el mapa
+        </button>
+      </div>
+    </div>
+
+  <button type="button" class="guardar" [disabled]="guardando" (click)="registrarVivienda()">
+  Registrar vivienda
+</button>
+  <p *ngIf="mensaje">{{ mensaje }}</p>
+
+  </div>
+
+</div>

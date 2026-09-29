@@ -1,0 +1,10 @@
+CREATE TABLE predio (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    direccion VARCHAR(250) NOT NULL,
+    referencia VARCHAR(250) NULL,
+    tipo_vivienda VARCHAR(40) NOT NULL,
+    codigo_predial VARCHAR(80) NOT NULL UNIQUE,
+    latitud DECIMAL(10,7) NULL,
+    longitud DECIMAL(10,7) NULL,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

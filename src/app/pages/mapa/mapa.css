@@ -1,0 +1,147 @@
+.mapa-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+  min-height: 600px;
+  box-sizing: border-box;
+}
+
+.mapa-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  color: #147c50;
+  letter-spacing: 1.2px;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+  display: block;
+}
+
+.mapa-header h1 {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f3926;
+  margin: 0 0 4px;
+  letter-spacing: -0.5px;
+}
+
+.mapa-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #556c60;
+}
+
+.mapa-actions {
+  display: flex;
+  gap: 10px;
+}
+.mapa-message { margin: 0 0 12px; padding: 10px 12px; color: var(--municipal-danger); background: #fff5f3; border-left: 3px solid var(--municipal-danger); font-size: 12px; }
+
+.btn-back {
+  background: #ffffff;
+  color: #445d50;
+  border: 1.5px solid #cadad0;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-back:hover {
+  background: #f0f7f3;
+}
+
+.btn-save-loc {
+  background: #147c50;
+  color: #ffffff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(20, 124, 80, 0.25);
+  transition: background 0.2s;
+}
+
+.btn-save-loc:hover {
+  background: #0f633f;
+}
+
+.coords-bar {
+  background: #ffffff;
+  border: 1px solid #dfe9e1;
+  border-radius: 10px;
+  padding: 12px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.coords-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #3b5045;
+}
+
+.coords-dot {
+  color: #a0b3a8;
+  font-size: 16px;
+}
+
+.coords-dot.active {
+  color: #147c50;
+}
+
+.coords-info code {
+  background: #f0f7f3;
+  border: 1px solid #cce2d5;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-weight: bold;
+  color: #113a27;
+}
+
+.distrito-badge {
+  background: #eef7f2;
+  color: #147c50;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.map-wrapper {
+  flex: 1;
+  border: 2px solid #d4ebdc;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(20, 124, 80, 0.08);
+  position: relative;
+  min-height: 450px;
+}
+
+#mapa {
+  width: 100%;
+  height: 100%;
+  min-height: 450px;
+  background: #e8ede9;
+}

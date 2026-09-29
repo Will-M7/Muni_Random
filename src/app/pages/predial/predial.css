@@ -1,0 +1,92 @@
+.contenedor {
+  min-height: 100vh;
+  background: #f4f7fb;
+  font-family: Arial, sans-serif;
+  padding: 40px;
+}
+
+.encabezado {
+  background: #0b4f8a;
+  color: white;
+  padding: 30px;
+  border-radius: 15px 15px 0 0;
+}
+
+.encabezado h1 {
+  margin: 0;
+  font-size: 32px;
+}
+
+.encabezado p {
+  font-size: 18px;
+}
+
+.formulario {
+  background: white;
+  padding: 40px;
+  max-width: 900px;
+  margin: auto;
+}
+
+.formulario h2 {
+  color: #124c75;
+  margin-top: 25px;
+}
+
+label {
+  display: block;
+  margin-top: 20px;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #31506b;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 15px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+.ubicacion {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  background: #eef6ff;
+  padding: 25px;
+  border-radius: 12px;
+  margin-top: 15px;
+}
+
+.icono {
+  font-size: 50px;
+}
+
+.ubicacion h3 {
+  color: #124c75;
+  margin: 0;
+}
+
+.ubicacion p {
+  color: #5d6872;
+}
+
+button {
+  background: #0b6eae;
+  color: white;
+  border: none;
+  padding: 14px 22px;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.guardar {
+  margin-top: 30px;
+  width: 100%;
+  background: #0b4f8a;
+  font-size: 18px;
+}

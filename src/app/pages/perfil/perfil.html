@@ -1,0 +1,29 @@
+<main class="access-page">
+  <section class="access-card">
+    <div class="seal-badge">SM</div>
+    <p class="eyebrow">MUNICIPALIDAD DISTRITAL DE SAN MIGUEL</p>
+    <h1>Sistema de Verificación Domiciliaria</h1>
+    <p class="desc">Perfil activo para la gestión municipal de solicitudes.</p>
+
+    <div class="roles-grid">
+      <button
+        type="button"
+        class="role-btn"
+        [class.selected-role]="rolActual === 'MUNICIPIO'"
+        (click)="entrar('MUNICIPIO')"
+      >
+        <span class="role-icon">Municipio</span>
+        <div class="role-text">
+          <strong>Municipio · Ventanilla</strong>
+          <small>Registro de solicitudes, carga de PDF y seguimiento de estados.</small>
+        </div>
+      </button>
+
+    </div>
+
+    <footer class="access-footer">
+      <span>Municipalidad Distrital de San Miguel · San Miguel, Lima</span>
+      <small>Prototipo Angular 100% Funcional con Almacenamiento Local</small>
+    </footer>
+  </section>
+</main>

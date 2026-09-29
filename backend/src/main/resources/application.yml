@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: san-miguel-api
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/${DB_NAME:san_miguel}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=utf8
+    username: ${DB_USER:sanmiguel}
+    password: ${DB_PASSWORD:sanmiguel_dev}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: America/Lima
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  servlet:
+    multipart:
+      max-file-size: ${APP_MAX_FILE_SIZE:10MB}
+      max-request-size: ${APP_MAX_REQUEST_SIZE:12MB}
+server:
+  port: ${SERVER_PORT:8080}
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-this-secret-to-a-long-random-value-in-production-please}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
+  cors-origins: ${CORS_ORIGINS:http://localhost:4200}
+  storage:
+    path: ${APP_STORAGE_PATH:uploads/solicitudes}
+    max-size-bytes: ${APP_MAX_FILE_SIZE_BYTES:10485760}
+  reniec:
+    mode: ${RENIEC_MODE:disabled}
+    base-url: ${RENIEC_BASE_URL:}
+    client-id: ${RENIEC_CLIENT_ID:}
+    client-secret: ${RENIEC_CLIENT_SECRET:}
+    api-key: ${RENIEC_API_KEY:}
+    connect-timeout-ms: ${RENIEC_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${RENIEC_READ_TIMEOUT_MS:4000}
+logging:
+  level:
+    pe.gob.munisanmiguel: INFO
