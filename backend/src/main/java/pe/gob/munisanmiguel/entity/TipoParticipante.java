@@ -1,0 +1,3 @@
+package pe.gob.munisanmiguel.entity;
+
+public enum TipoParticipante { FISCALIZADOR_RESPONSABLE, PERSONAL_MUNICIPAL, REPRESENTANTE_FISCALIZADO, ENTIDAD_EXTERNA, OTRO }

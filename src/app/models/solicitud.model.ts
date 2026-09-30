@@ -1,4 +1,4 @@
-export type Rol = 'MUNICIPIO' | 'FISCALIZADOR';
+export type Rol = 'ADMIN_SISTEMA' | 'MUNICIPIO' | 'FISCALIZADOR';
 
 export type EstadoSolicitud =
   | 'En espera'
@@ -9,10 +9,8 @@ export type ResultadoFiscalizacion = 'PENDIENTE' | 'REALIZADA' | 'NO_REALIZADA';
 
 export interface Fiscalizador {
   id: string;
-  codigo: string;
   nombre: string;
   zona: string;
-  telefono: string;
   activo: boolean;
 }
 

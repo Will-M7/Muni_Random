@@ -15,9 +15,9 @@ public class JwtService {
     public JwtService(@Value("${app.jwt.secret}") String secret, @Value("${app.jwt.expiration-minutes}") long expirationMinutes) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8)); this.expirationMinutes = expirationMinutes;
     }
-    public String create(String username, String role, String fiscalizadorId) {
+    public String create(String username, String fiscalizadorId) {
         Instant now = Instant.now();
-        return Jwts.builder().subject(username).claim("role", role).claim("fiscalizadorId", fiscalizadorId == null ? "" : fiscalizadorId)
+        return Jwts.builder().subject(username).claim("fiscalizadorId", fiscalizadorId == null ? "" : fiscalizadorId)
                 .issuedAt(Date.from(now)).expiration(Date.from(now.plusSeconds(expirationMinutes * 60))).signWith(key).compact();
     }
     public Jws<Claims> parse(String token) { return Jwts.parser().verifyWith(key).build().parseSignedClaims(token); }

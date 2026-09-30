@@ -1,3 +1,3 @@
 package pe.gob.munisanmiguel.controller;
-import pe.gob.munisanmiguel.dto.ApiDtos.*; import pe.gob.munisanmiguel.service.SolicitudService; import org.springframework.web.bind.annotation.*; import java.util.List;
-@RestController @RequestMapping("/api/catalogos") public class CatalogoController { private final SolicitudService service; public CatalogoController(SolicitudService s){service=s;} @GetMapping("/fiscalizadores") public List<FiscalizadorResponse> fiscalizadores(){return service.fiscalizadores();} }
+import pe.gob.munisanmiguel.dto.ApiDtos.FiscalizadorDisponibleResponse; import pe.gob.munisanmiguel.service.UsuarioService; import org.springframework.web.bind.annotation.*; import org.springframework.security.access.prepost.PreAuthorize; import java.util.List;
+@RestController @RequestMapping("/api/catalogos") public class CatalogoController { private final UsuarioService service; public CatalogoController(UsuarioService s){service=s;} @GetMapping("/fiscalizadores") @PreAuthorize("hasAuthority('FISCALIZADORES_DISPONIBLES_VER')") public List<FiscalizadorDisponibleResponse> fiscalizadores(){return service.fiscalizadoresDisponibles();} }

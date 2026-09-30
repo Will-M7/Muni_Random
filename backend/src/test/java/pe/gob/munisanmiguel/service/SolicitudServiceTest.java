@@ -23,7 +23,7 @@ import static org.mockito.Mockito.*;
 
 class SolicitudServiceTest {
     @Test
-    void soloExpiraLaVisitaVencidaPendienteYRegistraMotivo() {
+    void vencimientoYaNoModificaElEstadoAdministrativoLegacy() {
         SolicitudRepository solicitudes = mock(SolicitudRepository.class);
         var servicio = new SolicitudService(solicitudes, mock(FiscalizadorRepository.class),
                 mock(SolicitudMapper.class), mock(DocumentoStorageService.class));
@@ -33,21 +33,17 @@ class SolicitudServiceTest {
         Solicitud realizadaUno = solicitudConResultado(fechaPasada, ResultadoFiscalizacion.REALIZADA);
         Solicitud realizadaDos = solicitudConResultado(fechaPasada, ResultadoFiscalizacion.REALIZADA);
         Solicitud noRealizada = solicitudConResultado(fechaPasada, ResultadoFiscalizacion.NO_REALIZADA);
-        when(solicitudes.vencidasPendientes(List.of(EstadoSolicitud.EN_ESPERA, EstadoSolicitud.OBSERVADA), ResultadoFiscalizacion.PENDIENTE,
-                LocalDate.of(2026, 9, 29), LocalTime.NOON)).thenReturn(List.of(vencida));
-
         servicio.expirarPendientes(LocalDateTime.of(2026, 9, 29, 12, 0));
 
-        assertEquals(EstadoSolicitud.EXPIRADO, vencida.getEstado());
+        assertEquals(EstadoSolicitud.OBSERVADA, vencida.getEstado());
         assertEquals(ResultadoFiscalizacion.PENDIENTE, vencida.getResultadoFiscalizacion());
-        assertEquals(1, vencida.getHistorialCambios().size());
-        org.junit.jupiter.api.Assertions.assertTrue(vencida.getHistorialCambios().getFirst().getNota().contains("2026-09-26 10:30"));
+        assertEquals(0, vencida.getHistorialCambios().size());
         for (Solicitud cerrada : List.of(realizadaUno, realizadaDos, noRealizada)) {
             assertEquals(EstadoSolicitud.EN_ESPERA, cerrada.getEstado());
             assertEquals(0, cerrada.getHistorialCambios().size());
             verify(solicitudes, never()).save(cerrada);
         }
-        verify(solicitudes).save(vencida);
+        verify(solicitudes, never()).save(vencida);
     }
 
     private Solicitud solicitudConResultado(LocalDate fecha, ResultadoFiscalizacion resultado) {

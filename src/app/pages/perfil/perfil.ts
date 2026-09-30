@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { Rol } from '../../models/solicitud.model';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-perfil',
@@ -10,26 +10,10 @@ import { Rol } from '../../models/solicitud.model';
   styleUrl: './perfil.css',
 })
 export class PerfilComponent implements OnInit {
-  rolActual: Rol = 'MUNICIPIO';
+  constructor(private router: Router, private auth: AuthService) {}
 
-  constructor(private router: Router) {}
-
-  ngOnInit(): void {
-    const r = localStorage.getItem('rolSM') as Rol;
-    if (r) {
-      this.rolActual = r;
-    }
-    if (this.rolActual === 'FISCALIZADOR') {
-      void this.router.navigate(['/fiscalizador']);
-    }
-  }
-
-  entrar(rol: Rol): void {
-    this.rolActual = rol;
-    localStorage.setItem('rolSM', rol);
-    if (rol === 'MUNICIPIO') {
-      this.router.navigate(['/inicio']);
-    }
-  }
+  get sesion() { return this.auth.session; }
+  ngOnInit(): void {}
+  entrar(): void { void this.router.navigate([this.auth.homeRoute()]); }
 }
 export { PerfilComponent as Perfil };

@@ -23,7 +23,9 @@ public class SecurityConfig {
     @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
     @Bean UserDetailsService userDetailsService(AppUserRepository users) {
         return username -> users.findByUsernameIgnoreCaseAndActivoTrue(username)
-                .map(u -> User.withUsername(u.getUsername()).password(u.getPasswordHash()).roles(u.getRole().name()).build())
+                .map(u -> User.withUsername(u.getUsername()).password(u.getPasswordHash()).authorities(
+                        u.getRoles().stream().flatMap(r -> r.getCapabilities().stream())
+                                .map(c -> new org.springframework.security.core.authority.SimpleGrantedAuthority(c.getCode())).distinct().toList()).build())
                 .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado"));
     }
     @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwt) throws Exception {
@@ -37,14 +39,7 @@ public class SecurityConfig {
                 }))
                 .authorizeHttpRequests(a -> a.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/usuarios/**").hasRole("MUNICIPIO")
-                        .requestMatchers("/api/fiscalizador/**").hasRole("FISCALIZADOR")
-                        .requestMatchers(HttpMethod.POST, "/api/solicitudes", "/api/solicitudes/**").hasRole("MUNICIPIO")
-                        .requestMatchers(HttpMethod.PUT, "/api/solicitudes/**").hasRole("MUNICIPIO")
-                        .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/**").hasAnyRole("MUNICIPIO", "FISCALIZADOR")
-                        .requestMatchers(HttpMethod.DELETE, "/api/solicitudes/**").hasRole("MUNICIPIO")
-                        .requestMatchers(HttpMethod.POST, "/api/predios").hasRole("MUNICIPIO")
-                        .requestMatchers(HttpMethod.GET, "/api/catalogos/**", "/api/solicitudes/**", "/api/reniec/**").hasRole("MUNICIPIO")
+                        .requestMatchers("/api/**").authenticated()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwt, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class).build();
     }

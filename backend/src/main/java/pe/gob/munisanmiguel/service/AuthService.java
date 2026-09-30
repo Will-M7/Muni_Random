@@ -10,8 +10,11 @@ import pe.gob.munisanmiguel.dto.ApiDtos.*; import pe.gob.munisanmiguel.exception
         if (identifier == null || identifier.isBlank()) throw new InvalidCredentialsException();
         var user = users.findByUsernameIgnoreCaseAndActivoTrue(identifier.trim()).orElseThrow(InvalidCredentialsException::new);
         if (!encoder.matches(request.password(), user.getPasswordHash())) throw new InvalidCredentialsException();
-        if (request.rol()!=null && !request.rol().isBlank() && !user.getRole().name().equalsIgnoreCase(request.rol())) throw new InvalidCredentialsException();
+        var roles = user.getRoles().stream().map(r -> r.getName()).sorted().toList();
+        if (request.rol()!=null && !request.rol().isBlank() && !roles.stream().anyMatch(r -> r.equalsIgnoreCase(request.rol()))) throw new InvalidCredentialsException();
         String fid = user.getFiscalizador()==null ? "" : user.getFiscalizador().getId();
-        return new LoginResponse(jwt.create(user.getUsername(), user.getRole().name(), fid), user.getDisplayName(), user.getCargo(), user.getUsername(), user.getRole().name(), fid);
+        String primaryRole = request.rol()!=null && roles.stream().anyMatch(r -> r.equalsIgnoreCase(request.rol())) ? request.rol().toUpperCase() : roles.stream().findFirst().orElse("");
+        var capabilities = user.getRoles().stream().flatMap(r -> r.getCapabilities().stream()).map(c -> c.getCode()).distinct().sorted().toList();
+        return new LoginResponse(jwt.create(user.getUsername(), fid), user.getDisplayName(), user.getCargo(), user.getUsername(), primaryRole, fid, roles, capabilities);
     }
 }

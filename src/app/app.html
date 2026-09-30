@@ -1,5 +1,5 @@
 <header class="topbar" *ngIf="!esRutaLogin && !esFiscalizador">
-  <a routerLink="/inicio" class="brand" aria-label="Ir al inicio institucional">
+  <a [routerLink]="esAdmin ? '/admin' : (esMunicipio ? '/expedientes' : '/fiscalizador')" class="brand" aria-label="Ir al inicio institucional">
     <img class="brand-mark" src="/assets/imagenes/logo_muni.jpeg" alt="Escudo de la Municipalidad Distrital de San Miguel">
     <span>
       <strong>San Miguel</strong>
@@ -8,10 +8,10 @@
   </a>
 
   <nav aria-label="Navegación principal">
-    <a *ngIf="esMunicipio" routerLink="/inicio" routerLinkActive="active">Inicio</a>
-    <a *ngIf="esMunicipio" routerLink="/nueva-solicitud" routerLinkActive="active">Registrar solicitud</a>
-    <a *ngIf="esMunicipio" routerLink="/solicitudes" routerLinkActive="active">Solicitudes</a>
-    <a *ngIf="esMunicipio" routerLink="/usuarios" routerLinkActive="active">Usuarios</a>
+    <a *ngIf="authService.hasCapability('EXPEDIENTE_VER')" routerLink="/expedientes" routerLinkActive="active">Fiscalizaciones</a>
+    <a *ngIf="authService.hasCapability('EXPEDIENTE_CREAR')" routerLink="/expedientes/nuevo" routerLinkActive="active">Nuevo expediente</a>
+    <a *ngIf="esMunicipio && puedeVerUsuarios" routerLink="/usuarios" routerLinkActive="active">Usuarios</a>
+    <a *ngIf="esAdmin" routerLink="/admin" routerLinkActive="active">Administración</a>
   </nav>
 
   <div class="topbar-right">

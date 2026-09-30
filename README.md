@@ -43,6 +43,12 @@ Se crean como datos iniciales de desarrollo mediante Flyway:
 
 Las contraseñas se almacenan como BCrypt. Cámbialas antes de un despliegue real.
 
+No se crea una cuenta ADMIN_SISTEMA con una contraseña predeterminada. Para provisionar la primera, inicia el backend con `ADMIN_BOOTSTRAP_USERNAME` y `ADMIN_BOOTSTRAP_PASSWORD` (mínimo 12 caracteres); el arranque la crea solo si ese username no existe y persiste la contraseña con BCrypt.
+
+Las capacidades efectivas se cargan desde `user_role`, `app_role` y `role_capability` en cada petición JWT. Los usuarios demo conservan sus nombres, contraseñas y relaciones con fiscalizadores. La administración técnica está en `/admin`; los endpoints de catálogo están bajo `/api/admin/roles` y `/api/admin/capacidades`.
+
+La administración de cuentas está reservada a ADMIN_SISTEMA. MUNICIPIO consulta el directorio operativo mínimo mediante `GET /api/catalogos/fiscalizadores`, autorizado con `FISCALIZADORES_DISPONIBLES_VER`.
+
 ## API principal
 
 - `POST /api/auth/login`
@@ -54,7 +60,7 @@ Las contraseñas se almacenan como BCrypt. Cámbialas antes de un despliegue rea
 - `GET /api/reniec/{dni}` consulta el proveedor RENIEC configurado en el backend y devuelve únicamente el DTO usado por el formulario.
 - `POST /api/predios`
 
-Los únicos estados son `En espera`, `Verificado` y `Observada`. El rol y catálogo de fiscalizador se conservan como datos históricos, pero el módulo operativo no está expuesto.
+La autorización de API usa capacidades verificadas en backend. `MUNICIPIO` conserva el flujo actual de solicitudes y programación; `FISCALIZADOR` accede a sus propias tareas y resultados; `ADMIN_SISTEMA` gestiona usuarios y la asignación de capacidades a roles, sin permisos operativos por defecto.
 
 ## Pruebas
 

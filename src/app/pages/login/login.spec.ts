@@ -11,8 +11,9 @@ describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
   let authService: { isAuthenticated: ReturnType<typeof vi.fn>; login: ReturnType<typeof vi.fn>; logout: ReturnType<typeof vi.fn> };
   let router: Router;
-  const session = (rol: 'FISCALIZADOR' | 'MUNICIPIO'): Sesion => ({
+  const session = (rol: 'ADMIN_SISTEMA' | 'FISCALIZADOR' | 'MUNICIPIO'): Sesion => ({
     token: 'token', nombre: 'Usuario', cargo: 'Cargo', correo: 'usuario@muni.gob.pe', rol,
+    capacidades: rol === 'ADMIN_SISTEMA' ? ['ROLES_VER'] : rol === 'FISCALIZADOR' ? ['TAREAS_PROPIAS_VER'] : ['SOLICITUD_VER'],
   });
 
   beforeEach(async () => {
@@ -49,6 +50,15 @@ describe('LoginComponent', () => {
     component.iniciarSesion();
     await fixture.whenStable();
     expect(router.navigate).toHaveBeenCalledWith(['/inicio']);
+  });
+
+  it('redirige a /admin con capacidades de administración', async () => {
+    authService.login.mockResolvedValue({ ...session('ADMIN_SISTEMA'), capacidades: ['ROLES_VER', 'USUARIOS_VER'] });
+    component.usuario = 'admin';
+    component.password = 'clave-segura';
+    component.iniciarSesion();
+    await fixture.whenStable();
+    expect(router.navigate).toHaveBeenCalledWith(['/admin']);
   });
 
   it('conserva los espacios de la contraseña', async () => {

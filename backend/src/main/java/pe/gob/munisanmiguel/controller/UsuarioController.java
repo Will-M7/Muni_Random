@@ -9,11 +9,12 @@ import pe.gob.munisanmiguel.dto.ApiDtos.UsuarioResponse;
 import pe.gob.munisanmiguel.service.UsuarioService;
 import java.util.List;
 
-@RestController @RequestMapping("/api/usuarios") @PreAuthorize("hasRole('MUNICIPIO')")
+@RestController @RequestMapping("/api/usuarios")
 public class UsuarioController {
     private final UsuarioService service;
     public UsuarioController(UsuarioService service) { this.service = service; }
-    @GetMapping public List<UsuarioResponse> listar() { return service.listar(); }
-    @GetMapping("/fiscalizadores") public List<pe.gob.munisanmiguel.dto.ApiDtos.FiscalizadorResponse> fiscalizadores() { return service.fiscalizadores(); }
-    @PostMapping @ResponseStatus(HttpStatus.CREATED) public UsuarioResponse crear(@Valid @RequestBody UsuarioRequest request) { return service.crear(request); }
+    @GetMapping @PreAuthorize("hasAuthority('USUARIOS_VER')") public List<UsuarioResponse> listar() { return service.listar(); }
+    @PostMapping @PreAuthorize("hasAuthority('USUARIOS_CREAR')") @ResponseStatus(HttpStatus.CREATED) public UsuarioResponse crear(@Valid @RequestBody UsuarioRequest request) { return service.crear(request); }
+    @PatchMapping("/{username}/estado") @PreAuthorize("hasAuthority('USUARIOS_ESTADO')") public UsuarioResponse estado(@PathVariable String username, @Valid @RequestBody pe.gob.munisanmiguel.dto.ApiDtos.UserActiveRequest request) { return service.cambiarEstado(username, request.activo()); }
+    @PutMapping("/{username}/roles") @PreAuthorize("hasAuthority('USUARIOS_EDITAR') or hasAuthority('ROLES_GESTIONAR')") public UsuarioResponse roles(@PathVariable String username, @Valid @RequestBody pe.gob.munisanmiguel.dto.ApiDtos.UserRolesRequest request) { return service.asignarRoles(username, request.roles()); }
 }

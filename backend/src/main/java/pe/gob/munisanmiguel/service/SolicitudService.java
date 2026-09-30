@@ -17,43 +17,38 @@ import java.util.*;
 
 @Service
 public class SolicitudService {
-    private final SolicitudRepository solicitudes; private final FiscalizadorRepository fiscalizadores; private final AppUserRepository users; private final SolicitudMapper mapper; private final DocumentoStorageService documentos;
-    @Autowired public SolicitudService(SolicitudRepository s, FiscalizadorRepository f, AppUserRepository u, SolicitudMapper m, DocumentoStorageService d) { solicitudes=s; fiscalizadores=f; users=u; mapper=m; documentos=d; }
-    public SolicitudService(SolicitudRepository s, FiscalizadorRepository f, SolicitudMapper m, DocumentoStorageService d) { this(s, f, null, m, d); }
+    private final SolicitudRepository solicitudes; private final FiscalizadorRepository fiscalizadores; private final AppUserRepository users; private final SolicitudMapper mapper; private final DocumentoStorageService documentos; private final ExpedienteFiscalizacionService expedientes;
+    @Autowired public SolicitudService(SolicitudRepository s, FiscalizadorRepository f, AppUserRepository u, SolicitudMapper m, DocumentoStorageService d, ExpedienteFiscalizacionService e) { solicitudes=s; fiscalizadores=f; users=u; mapper=m; documentos=d; expedientes=e; }
+    public SolicitudService(SolicitudRepository s, FiscalizadorRepository f, AppUserRepository u, SolicitudMapper m, DocumentoStorageService d) { this(s, f, u, m, d, null); }
+    public SolicitudService(SolicitudRepository s, FiscalizadorRepository f, SolicitudMapper m, DocumentoStorageService d) { this(s, f, null, m, d, null); }
     @Transactional public void expirarPendientes() {
-        expirarPendientes(LocalDateTime.now(ZoneId.of("America/Lima")));
+        // Compatibility hook for legacy endpoints. Expiration now updates ProgramacionFiscalizacion only.
+        if(expedientes!=null)expedientes.vencerProgramaciones();
     }
     void expirarPendientes(LocalDateTime ahora) {
-        for (var solicitud : solicitudes.vencidasPendientes(List.of(EstadoSolicitud.EN_ESPERA, EstadoSolicitud.OBSERVADA),
-                ResultadoFiscalizacion.PENDIENTE, ahora.toLocalDate(), ahora.toLocalTime())) {
-            solicitud.setEstado(EstadoSolicitud.EXPIRADO);
-            agregarHistorial(solicitud, EstadoSolicitud.EXPIRADO,
-                    "Fiscalización programada para " + solicitud.getFechaFiscalizacion() + " "
-                            + solicitud.getHoraFiscalizacion() + " vencida sin resultado de visita");
-        }
+        // Kept package-visible for old callers/tests while the legacy Solicitud model is phased out.
     }
     @Transactional(readOnly=true) public List<SolicitudResponse> buscar(String q,String estado,LocalDate fecha,String fiscalizadorId){String term=q==null?"":q.trim().toLowerCase();EstadoSolicitud parsed=estado==null||estado.isBlank()?null:EstadoSolicitud.fromFrontend(estado);return solicitudes.findAllByOrderByFechaRegistroDescIdDesc().stream().filter(s->fecha==null||s.getFecha().equals(fecha)).filter(s->parsed==null||s.getEstado()==parsed).filter(s->fiscalizadorId==null||fiscalizadorId.isBlank()||(s.getFiscalizador()!=null&&s.getFiscalizador().getId().equals(fiscalizadorId))).filter(s->term.isBlank()||s.getCodigo().toLowerCase().contains(term)||s.nombreCompleto().toLowerCase().contains(term)||s.getDni().contains(term)||s.getDireccion().toLowerCase().contains(term)||(s.getFiscalizador()!=null&&s.getFiscalizador().getNombre().toLowerCase().contains(term))).map(mapper::toResponse).toList();}
     @Transactional(readOnly=true) public SolicitudResponse porCodigo(String codigo){return mapper.toResponse(entidad(codigo));}
     @Transactional(readOnly=true) public Documento documento(String codigo){var s=entidad(codigo);return archivo(s.getDocumentoNombreInterno(),s.getDocumento(),"Documento no encontrado.");}
     @Transactional(readOnly=true) public Documento reporte(String codigo){var s=entidad(codigo);return archivo(s.getReporteNombreInterno(),s.getReporteNombreOriginal(),"Reporte de fiscalización no encontrado.");}
     private Documento archivo(String interno,String original,String error){Resource r=documentos.load(interno);if(r==null)throw new NotFoundException(error);return new Documento(r,original==null?"documento.pdf":original);}
-    @Transactional public SolicitudResponse crear(SolicitudRequest r,MultipartFile file){rechazarExpiradoManual(r.estado(),null);return guardar(null,r,file);}
-    @Transactional public SolicitudResponse actualizar(String codigo,SolicitudRequest r,MultipartFile file){var s=entidad(codigo);rechazarExpiradoManual(r.estado(),s.getEstado());return guardar(s,r,file);}
+    @Transactional public SolicitudResponse crear(SolicitudRequest r,MultipartFile file,String actor){rechazarExpiradoManual(r.estado(),null);return guardar(null,r,file,actor);}
+    @Transactional public SolicitudResponse actualizar(String codigo,SolicitudRequest r,MultipartFile file,String actor){var s=entidad(codigo);rechazarExpiradoManual(r.estado(),s.getEstado());return guardar(s,r,file,actor);}
     private void rechazarExpiradoManual(String pedido,EstadoSolicitud actual){
         if(pedido!=null&&!pedido.isBlank()&&EstadoSolicitud.fromFrontend(pedido)==EstadoSolicitud.EXPIRADO&&actual!=EstadoSolicitud.EXPIRADO)
-            throw new ConflictException("EXPIRADO se genera automáticamente al vencer una visita sin resultado.");
+            throw new ConflictException("EXPIRADO se conserva solo para registros históricos; el vencimiento corresponde a la programación.");
     }
-    private SolicitudResponse guardar(Solicitud s,SolicitudRequest r,MultipartFile file){boolean nuevo=s==null;EstadoSolicitud anterior=nuevo?null:s.getEstado();if(nuevo){s=new Solicitud();s.setCodigo(nuevoCodigo());s.setFechaRegistro(today());}String documentoAnterior=s.getDocumentoNombreInterno();var stored=file==null||file.isEmpty()?null:documentos.store(file);s.setNombres(r.nombres().trim());s.setApellidos(r.apellidos().trim());s.setDni(r.dni());s.setTelefono(r.telefono().trim());s.setDireccion(r.direccion().trim());s.setReferencia(blank(r.referencia()));if(stored!=null){s.setDocumento(stored.originalName());s.setDocumentoTamano(Math.round(stored.size()/1024.0)+" KB");s.setDocumentoNombreInterno(stored.internalName());s.setDocumentoContentType(stored.contentType());s.setDocumentoRuta(stored.relativePath());s.setDocumentoFechaSubida(stored.uploadedAt());}if(nuevo&&s.getDocumentoNombreInterno()==null)throw new ConflictException("Debe adjuntar el documento PDF.");s.setLatitud(r.latitud());s.setLongitud(r.longitud());s.setFecha(r.fecha());s.setHora(r.hora());s.setFechaFiscalizacion(r.fechaFiscalizacion());s.setHoraFiscalizacion(r.horaFiscalizacion());s.setFiscalizador(r.fiscalizadorId()==null||r.fiscalizadorId().isBlank()?null:fiscalizadores.findById(r.fiscalizadorId()).orElseThrow(()->new NotFoundException("Fiscalizador no encontrado.")));validarHorario(s);s.setEstado(r.estado()==null||r.estado().isBlank()?(nuevo?EstadoSolicitud.EN_ESPERA:s.getEstado()):EstadoSolicitud.fromFrontend(r.estado()));s.setObservaciones(r.observaciones());try{solicitudes.save(s);if(nuevo)agregarHistorial(s,EstadoSolicitud.EN_ESPERA,"Registro en ventanilla");else if(anterior!=s.getEstado())agregarHistorial(s,s.getEstado(),"Cambio de estado desde edición de solicitud");}catch(RuntimeException ex){if(stored!=null)documentos.delete(stored.internalName());throw ex;}if(stored!=null&&documentoAnterior!=null&&!documentoAnterior.equals(stored.internalName()))documentos.delete(documentoAnterior);return mapper.toResponse(s);}
+    private SolicitudResponse guardar(Solicitud s,SolicitudRequest r,MultipartFile file,String actor){boolean nuevo=s==null;EstadoSolicitud anterior=nuevo?null:s.getEstado();if(nuevo){s=new Solicitud();s.setCodigo(nuevoCodigo());s.setFechaRegistro(today());}String documentoAnterior=s.getDocumentoNombreInterno();var stored=file==null||file.isEmpty()?null:documentos.store(file);s.setNombres(r.nombres().trim());s.setApellidos(r.apellidos().trim());s.setDni(r.dni());s.setTelefono(r.telefono().trim());s.setDireccion(r.direccion().trim());s.setReferencia(blank(r.referencia()));if(stored!=null){s.setDocumento(stored.originalName());s.setDocumentoTamano(Math.round(stored.size()/1024.0)+" KB");s.setDocumentoNombreInterno(stored.internalName());s.setDocumentoContentType(stored.contentType());s.setDocumentoRuta(stored.relativePath());s.setDocumentoFechaSubida(stored.uploadedAt());}if(nuevo&&s.getDocumentoNombreInterno()==null)throw new ConflictException("Debe adjuntar el documento PDF.");s.setLatitud(r.latitud());s.setLongitud(r.longitud());s.setFecha(r.fecha());s.setHora(r.hora());s.setFechaFiscalizacion(r.fechaFiscalizacion());s.setHoraFiscalizacion(r.horaFiscalizacion());s.setFiscalizador(r.fiscalizadorId()==null||r.fiscalizadorId().isBlank()?null:fiscalizadores.findById(r.fiscalizadorId()).orElseThrow(()->new NotFoundException("Fiscalizador no encontrado.")));validarHorario(s);s.setEstado(r.estado()==null||r.estado().isBlank()?(nuevo?EstadoSolicitud.EN_ESPERA:s.getEstado()):EstadoSolicitud.fromFrontend(r.estado()));s.setObservaciones(r.observaciones());try{solicitudes.save(s);if(nuevo)agregarHistorial(s,EstadoSolicitud.EN_ESPERA,"Registro en ventanilla");else if(anterior!=s.getEstado())agregarHistorial(s,s.getEstado(),"Cambio de estado desde edición de solicitud");if(expedientes!=null)expedientes.sincronizarSolicitud(s,actor);}catch(RuntimeException ex){if(stored!=null)documentos.delete(stored.internalName());throw ex;}if(stored!=null&&documentoAnterior!=null&&!documentoAnterior.equals(stored.internalName()))documentos.delete(documentoAnterior);return mapper.toResponse(s);}
     @Transactional public SolicitudResponse cambiarEstado(String codigo,EstadoRequest r){
         var s=entidad(codigo);var e=EstadoSolicitud.fromFrontend(r.estado());
-        if(e==EstadoSolicitud.EXPIRADO)throw new ConflictException("EXPIRADO se genera automáticamente al vencer una visita sin resultado.");
+        if(e==EstadoSolicitud.EXPIRADO)throw new ConflictException("EXPIRADO se conserva solo para registros históricos; el vencimiento corresponde a la programación.");
         s.setEstado(e);
         if(r.resultado()!=null&&!r.resultado().isBlank())s.setResultadoVisita(r.resultado());
         if(r.observacionAdicional()!=null&&!r.observacionAdicional().isBlank())s.setObservaciones((s.getObservaciones()==null?"":s.getObservaciones()+"\n")+r.observacionAdicional());
         agregarHistorial(s,e,r.resultado()!=null?r.resultado():r.observacionAdicional());return mapper.toResponse(s);
     }
     @Transactional public void eliminar(String codigo){var s=entidad(codigo);solicitudes.delete(s);documentos.delete(s.getDocumentoNombreInterno());documentos.delete(s.getReporteNombreInterno());}
-    @Transactional(readOnly=true) public List<FiscalizadorResponse> fiscalizadores(){return fiscalizadores.findAll().stream().filter(Fiscalizador::isActivo).map(mapper::toResponse).toList();}
     @Transactional(readOnly=true) public List<ProgramacionResponse> programacion(LocalDate fecha){return solicitudes.findAllByFechaFiscalizacionAndHoraFiscalizacionIsNotNullOrderByHoraFiscalizacionAsc(fecha).stream().map(s->new ProgramacionResponse(s.getCodigo(),s.getHoraFiscalizacion(),s.nombreCompleto(),s.getFiscalizador()==null?"Sin asignar":s.getFiscalizador().getNombre(),s.getEstado().toFrontend())).toList();}
     @Transactional(readOnly=true) public List<FiscalizadorTaskResponse> misTareas(Authentication a,LocalDate fecha){var u=usuario(a);if(u.getFiscalizador()==null)throw new NotFoundException("El usuario no tiene fiscalizador asociado.");return solicitudes.findAllByFiscalizadorIdAndFechaFiscalizacionOrderByHoraFiscalizacionAsc(u.getFiscalizador().getId(),fecha==null?today():fecha).stream().map(this::task).toList();}
     @Transactional(readOnly=true) public List<FiscalizadorTaskResponse> misProximas(Authentication a){var u=usuario(a);if(u.getFiscalizador()==null)throw new NotFoundException("El usuario no tiene fiscalizador asociado.");return solicitudes.findAllByFiscalizadorIdAndFechaFiscalizacionGreaterThanOrderByFechaFiscalizacionAscHoraFiscalizacionAsc(u.getFiscalizador().getId(),today()).stream().filter(s->s.getResultadoFiscalizacion()==null||s.getResultadoFiscalizacion()==ResultadoFiscalizacion.PENDIENTE).map(this::task).toList();}
@@ -62,7 +57,8 @@ public class SolicitudService {
     @Transactional(readOnly=true) public SolicitudResponse mapperResponse(Solicitud s){return mapper.toResponse(s);}
     @Transactional public SolicitudResponse registrarResultado(String codigo,ResultadoFiscalizacionRequest r,MultipartFile reporte,Authentication a){
         var s=tareaPropia(codigo,a);
-        if(s.getEstado()==EstadoSolicitud.EXPIRADO)throw new ConflictException("La fiscalización expiró sin resultado; debe revisarse su programación.");
+        if(expedientes!=null)expedientes.validarResultadoRegistrable(s);
+        if(expedientes==null&&s.getEstado()==EstadoSolicitud.EXPIRADO)throw new ConflictException("La fiscalización expiró sin resultado; debe revisarse su programación.");
         if(r.resultado()==ResultadoFiscalizacion.PENDIENTE)throw new ConflictException("Debe registrar un resultado definitivo.");
         if(r.resultado()==ResultadoFiscalizacion.REALIZADA&&(reporte==null||reporte.isEmpty()))throw new ConflictException("Debe adjuntar el reporte PDF para una fiscalización realizada.");
         if(r.resultado()==ResultadoFiscalizacion.NO_REALIZADA&&(r.observaciones()==null||r.observaciones().isBlank()))throw new ConflictException("Debe registrar el motivo de la fiscalización no realizada.");
@@ -71,6 +67,7 @@ public class SolicitudService {
         if(stored!=null){s.setReporteNombreOriginal(stored.originalName());s.setReporteNombreInterno(stored.internalName());s.setReporteContentType(stored.contentType());s.setReporteTamano(stored.size());s.setReporteRuta(stored.relativePath());s.setReporteFechaSubida(stored.uploadedAt());}
         String nota="Resultado operativo: "+r.resultado().name()+(r.resultado()==ResultadoFiscalizacion.REALIZADA?"; reporte PDF adjunto":"; motivo: "+s.getObservacionesFiscalizador());
         agregarHistorial(s,s.getEstado(),nota.length()>500?nota.substring(0,500):nota);
+        if(expedientes!=null)expedientes.sincronizarResultado(s,a.getName());
         if(stored!=null&&anterior!=null&&!anterior.equals(stored.internalName()))documentos.delete(anterior);
         return mapper.toResponse(s);
     }

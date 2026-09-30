@@ -15,7 +15,7 @@ type Coordenadas = [number, number];
   selector: 'app-fiscalizador',
   imports: [CommonModule, FormsModule, RouterLink, RouterLinkActive],
   templateUrl: './fiscalizador.html',
-  styleUrl: './fiscalizador.css',
+  styleUrls: ['./fiscalizador.css', './fiscalizador-clarification.css'],
 })
 export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('routeMap') routeMap?: ElementRef<HTMLDivElement>;
@@ -24,6 +24,8 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   tareasDia: FiscalizadorTarea[] = [];
   proximas: FiscalizadorTarea[] = [];
   historial: FiscalizadorTarea[] = [];
+  aclaraciones: any[] = [];
+  respuestasAclaracion: Record<number,string> = {};
   seleccionada: FiscalizadorTarea | null = null;
   ubicacionActual: Coordenadas | null = null;
   ubicacionActualTexto = '';
@@ -80,12 +82,30 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   async cargar(): Promise<void> {
     this.cargando = true; this.error = '';
     try {
-      const [dia, proximas, historial] = await Promise.all([
+      const [dia, proximas, historial, asignaciones, aclaraciones] = await Promise.all([
         this.service.obtenerMisTareas(this.fecha),
         this.service.obtenerMisProximas(),
         this.service.obtenerMiHistorial(this.historialFecha || undefined, this.historialResultado),
+        this.service.obtenerMisExpedientesCampo(),
+        this.auth.hasCapability('ACLARACION_RESPONDER') ? this.service.misAclaraciones() : Promise.resolve([]),
       ]);
-      this.tareasDia = dia; this.proximas = proximas; this.historial = historial;
+      this.aclaraciones = aclaraciones;
+      const tareasExpediente = asignaciones.filter(t => t.latitud !== null && t.longitud !== null).map(t => ({
+        codigo:t.codigo, ciudadano:t.administrado || 'Administrado sin identificar', dni:t.documentoAdministrado || '',
+        telefono:t.telefono || '', direccion:t.direccion || '', referencia:t.referencia || '', fecha:t.fecha, hora:t.hora,
+        latitud:t.latitud!, longitud:t.longitud!, documento:'', resultado:(t.estadoProgramacion==='REALIZADA'?'REALIZADA':t.estadoProgramacion==='NO_REALIZADA'?'NO_REALIZADA':'PENDIENTE') as 'PENDIENTE'|'REALIZADA'|'NO_REALIZADA', estadoSolicitud:t.estadoExpediente,
+        esExpediente:true, objetoFiscalizacion:t.objetoFiscalizacion, estadoProgramacion:t.estadoProgramacion,
+        tipoVisita:t.tipoVisita, origen:t.origen, programacionId:t.programacionId, diligenciaId:t.diligenciaId, estadoDiligencia:t.estadoDiligencia,
+      }));
+      const solicitudesMigradas = new Set(asignaciones.map(t => t.solicitudCodigo).filter((codigo): codigo is string => !!codigo));
+      const tareasLegacy = (tareas: FiscalizadorTarea[]) => tareas.filter(t => !solicitudesMigradas.has(t.codigo));
+      const activas=tareasExpediente.filter(t=>['PROGRAMADA','EN_CURSO','VENCIDA'].includes(t.estadoProgramacion||''));
+      this.tareasDia = [...tareasLegacy(dia), ...activas.filter(t => t.fecha === this.fecha)].sort((a,b) => a.hora.localeCompare(b.hora));
+      this.proximas = [...tareasLegacy(proximas), ...activas.filter(t => t.fecha > todayPeru())].sort((a,b) => a.fecha.localeCompare(b.fecha)||a.hora.localeCompare(b.hora));
+      const historialNativo=tareasExpediente.filter(t=>t.resultado!=='PENDIENTE')
+        .filter(t=>!this.historialFecha||t.fecha===this.historialFecha)
+        .filter(t=>this.historialResultado==='TODOS'||t.resultado===this.historialResultado);
+      this.historial = [...tareasLegacy(historial),...historialNativo].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.hora.localeCompare(a.hora));
       this.cdr.markForCheck();
       setTimeout(() => this.actualizarMapa());
     } catch { this.error = 'No se pudieron cargar tus fiscalizaciones.'; }
@@ -93,7 +113,10 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async cambiarFecha(): Promise<void> { await this.cargar(); }
+  cancelarRespuestaAclaracion(id:number):void{delete this.respuestasAclaracion[id];this.error='';this.cdr.markForCheck();}
+  async responderAclaracion(id:number):Promise<void>{const response=this.respuestasAclaracion[id]?.trim();if(!response)return;this.guardando=true;this.error='';try{await this.service.responderAclaracion(id,response);delete this.respuestasAclaracion[id];this.aclaraciones=await this.service.misAclaraciones();}catch(e:any){this.error=e?.error?.message||'No se pudo responder la aclaración.';}finally{this.guardando=false;this.cdr.markForCheck();}}
   async cambiarFiltroHistorial(): Promise<void> { await this.cargar(); }
+  abrirDiligencia(programacionId?: number): void { if (programacionId) void this.router.navigate(['/fiscalizador/diligencia', programacionId]); }
 
   actualizarUbicacion(): void {
     if (!navigator.geolocation) { this.gpsMensaje = 'Este navegador no ofrece ubicación GPS.'; return; }

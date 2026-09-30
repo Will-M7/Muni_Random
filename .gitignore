@@ -38,3 +38,9 @@ logs/
 # Uploads locales si existen
 uploads/
 .npm-cache/
+
+# Local AI/tool metadata
+.serena/
+
+# Local AI/tool metadata
+.serena/

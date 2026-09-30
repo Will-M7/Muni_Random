@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { AuthService } from '../../services/auth.service';
+import { AuthService, Sesion } from '../../services/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -29,7 +29,7 @@ export class LoginComponent implements OnInit {
 
   ngOnInit(): void {
     if (this.authService.isAuthenticated()) {
-      void this.router.navigate([this.authService.session?.rol === 'FISCALIZADOR' ? '/perfil' : '/inicio']);
+      void this.router.navigate([this.rutaInicio(this.authService.session)]);
       return;
     }
 
@@ -58,13 +58,13 @@ export class LoginComponent implements OnInit {
     this.cargando = true;
     this.authService.login(u, p).then(session => {
       this.cargando = false;
-      if (session.rol !== 'FISCALIZADOR' && session.rol !== 'MUNICIPIO') {
+      if (!session.token || !Array.isArray(session.capacidades)) {
         this.authService.logout();
         this.mensajeError = 'No se pudo iniciar sesión.';
         return;
       }
       this.mensajeExito = 'Acceso concedido. Ingresando al sistema...';
-      void this.router.navigate([session.rol === 'FISCALIZADOR' ? '/fiscalizador' : '/inicio']);
+      void this.router.navigate([this.rutaInicio(session)]);
     }).catch((error: unknown) => {
       this.cargando = false;
       this.mensajeError = this.mensajeParaError(error);
@@ -77,5 +77,14 @@ export class LoginComponent implements OnInit {
     if (status === 0) return 'No se pudo conectar con el servidor.';
     if (status >= 500) return 'El servidor no pudo completar el inicio de sesión.';
     return 'No se pudo iniciar sesión.';
+  }
+
+  private rutaInicio(session: Sesion | null): string {
+    const capabilities = session?.capacidades;
+    if (capabilities?.includes('ROLES_VER')) return '/admin';
+    if (capabilities?.includes('TAREAS_PROPIAS_VER')) return '/fiscalizador';
+    if (capabilities?.includes('EXPEDIENTE_VER')) return '/expedientes';
+    if (capabilities?.includes('SOLICITUD_VER')) return '/inicio';
+    return '/perfil';
   }
 }

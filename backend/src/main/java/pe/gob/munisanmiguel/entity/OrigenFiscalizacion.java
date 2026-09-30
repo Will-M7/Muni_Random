@@ -1,0 +1,3 @@
+package pe.gob.munisanmiguel.entity;
+
+public enum OrigenFiscalizacion { SOLICITUD, DENUNCIA, INICIATIVA_MUNICIPAL, ORDEN_SUPERIOR, OPERATIVO_PROGRAMADO, OPERATIVO_INOPINADO, OTRO }

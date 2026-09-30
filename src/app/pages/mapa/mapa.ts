@@ -41,6 +41,7 @@ export class MapaComponent implements OnInit, AfterViewInit, OnDestroy {
     const qp = this.route.snapshot.queryParamMap;
     this.codigoSolicitud = qp.get('codigo') || qp.get('edit') || '';
     this.origenRuta = qp.get('retorno') || 'nueva-solicitud';
+    this.terminoBusqueda = qp.get('q') || '';
 
     if (this.codigoSolicitud) {
       const s = await this.verificacionService.cargarSolicitud(this.codigoSolicitud);
@@ -52,7 +53,7 @@ export class MapaComponent implements OnInit, AfterViewInit, OnDestroy {
         this.coordenadasSeleccionadas = true;
         this.changeDetector.markForCheck();
       }
-    } else {
+    } else if (this.origenRuta !== 'expedientes/nuevo') {
       const guardada = localStorage.getItem('ubicacionVivienda');
       if (guardada) {
         try {
@@ -102,6 +103,7 @@ export class MapaComponent implements OnInit, AfterViewInit, OnDestroy {
         this.longitudActual = lng;
         this.coordenadasSeleccionadas = true;
         this.colocarMarcador(lat, lng);
+        this.changeDetector.markForCheck();
       });
     });
   }
@@ -156,12 +158,14 @@ export class MapaComponent implements OnInit, AfterViewInit, OnDestroy {
     };
 
     localStorage.setItem('sm_temp_ubicacion_mapa', JSON.stringify(payload));
-    localStorage.setItem('ubicacionVivienda', JSON.stringify(payload));
+    if (this.origenRuta !== 'expedientes/nuevo') localStorage.setItem('ubicacionVivienda', JSON.stringify(payload));
 
-    this.router.navigate(this.codigoSolicitud ? ['/nueva-solicitud', this.codigoSolicitud] : ['/nueva-solicitud']);
+    if (this.origenRuta === 'expedientes/nuevo') this.router.navigate(['/expedientes/nuevo']);
+    else this.router.navigate(this.codigoSolicitud ? ['/nueva-solicitud', this.codigoSolicitud] : ['/nueva-solicitud']);
   }
 
   volver(): void {
+    if (this.origenRuta === 'expedientes/nuevo') { this.router.navigate(['/expedientes/nuevo']); return; }
     if (this.codigoSolicitud) {
       this.router.navigate(['/nueva-solicitud', this.codigoSolicitud]);
     } else {

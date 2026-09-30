@@ -17,5 +17,4 @@ public class SolicitudMapper {
                 s.getResultadoFiscalizacion() == null ? ResultadoFiscalizacion.PENDIENTE.name() : s.getResultadoFiscalizacion().name(),
                 s.getObservacionesFiscalizador(), s.getReporteNombreOriginal(), s.getReporteTamano(), s.getFechaEjecucion());
     }
-    public FiscalizadorResponse toResponse(Fiscalizador f) { return new FiscalizadorResponse(f.getId(), f.getCodigo(), f.getNombre(), f.getZona(), f.getTelefono(), f.isActivo()); }
 }

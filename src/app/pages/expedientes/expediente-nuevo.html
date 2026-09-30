@@ -1,0 +1,28 @@
+<main class="expedientes-page form-page">
+  <a class="back" routerLink="/expedientes">‹ Volver a Fiscalizaciones</a>
+  <header class="page-head"><div><p class="eyebrow">FISCALIZACIONES · NUEVO REGISTRO</p><h1>Nuevo expediente de fiscalización</h1><p>Registro interno municipal. El administrado no requiere una cuenta.</p></div></header>
+  <p class="error" *ngIf="error" role="alert">{{error}}</p>
+  <form (ngSubmit)="guardar()">
+    <section class="panel form-section"><h2>Origen del expediente</h2><div class="form-grid">
+      <label>Origen<select [(ngModel)]="origen" name="origen" required><option *ngFor="let o of origenes" [value]="o[0]">{{o[1]}}</option></select></label>
+      <label *ngIf="origen==='SOLICITUD'">Solicitud legacy vinculada (opcional)<select [(ngModel)]="solicitudCodigo" name="solicitud" (change)="cargarSolicitud()"><option value="">Sin vínculo legacy</option><option *ngFor="let s of solicitudes" [value]="s.codigo">{{s.codigo}} · {{s.nombre}} · {{s.dni}}</option></select></label>
+      <label class="wide">Referencia o detalle del origen<textarea [(ngModel)]="detalleOrigen" name="detalleOrigen" rows="2" placeholder="Referencia, documento, memorando o descripción"></textarea></label>
+      <label class="wide">Objeto de la fiscalización<textarea [(ngModel)]="objetoFiscalizacion" name="objeto" rows="2" required maxlength="255" placeholder="Indica qué debe verificarse en la visita"></textarea></label>
+      <label class="wide">Observaciones iniciales (opcional)<textarea [(ngModel)]="observacionesIniciales" name="observaciones" rows="2"></textarea></label>
+    </div></section>
+    <section class="panel form-section"><div class="section-head"><div><h2>Datos del administrado</h2><p>Persona natural · preparado para ampliar a persona jurídica en otra fase.</p></div></div><div class="form-grid">
+      <label>DNI<input [(ngModel)]="dni" name="dni" required maxlength="8" inputmode="numeric"></label>
+      <div class="inline-field"><button class="btn-light" type="button" (click)="consultarDni()">Consultar RENIEC</button><small>{{reniecMensaje}}</small></div>
+      <label>Nombres<input [(ngModel)]="nombres" name="nombres" required></label><label>Apellidos<input [(ngModel)]="apellidos" name="apellidos" required></label>
+      <label>Teléfono<input [(ngModel)]="telefono" name="telefono" type="tel"></label><label>Dirección exacta<input [(ngModel)]="direccion" name="direccion" required></label>
+      <label class="wide">Referencia de domicilio<input [(ngModel)]="referencia" name="referencia"></label>
+    </div><div class="location-box"><div><b>Ubicación del predio</b><p>{{ubicacionConfirmada?('Coordenadas confirmadas: '+latitud+', '+longitud):'Busca la dirección y confirma el punto exacto en el mapa.'}}</p></div><div class="location-actions"><a *ngIf="direccion.trim()" class="btn-light" [href]="urlGoogleMaps()" target="_blank" rel="noopener">Buscar dirección en Google Maps</a><a class="btn-light" routerLink="/mapa" [queryParams]="{retorno:'expedientes/nuevo',q:direccion}" (click)="prepararMapa()">Marcar punto del predio</a></div></div><p class="hint">La ubicación solo queda confirmada después de marcar un punto en el selector interno.</p></section>
+    <section class="panel form-section"><h2>Documento de sustento</h2><p>PDF opcional. Adjunta órdenes, denuncias u otros documentos cuando corresponda.</p><label class="file-label">Archivo PDF<input type="file" accept="application/pdf,.pdf" (change)="seleccionarArchivo($event)"></label><small *ngIf="archivo">{{archivo.name}}</small><small *ngIf="!archivo&&origenConDocumento">Puedes continuar sin PDF si el origen no tiene documento adjunto.</small></section>
+    <section class="panel form-section"><label class="check-row"><input type="checkbox" [(ngModel)]="programar" name="programar"><span><b>Crear primera programación</b><small>También puedes programarla más adelante.</small></span></label><div class="form-grid schedule-fields" *ngIf="programar">
+      <label>Tipo de visita<select [(ngModel)]="tipoVisita" name="tipoVisita"><option value="PROGRAMADA">Programada</option><option value="INOPINADA">Inopinada</option></select></label><label>Fecha operativa<input type="date" [(ngModel)]="fecha" name="fecha" required></label>
+      <label>Hora operativa<input type="time" [(ngModel)]="hora" name="hora" required></label><label>Fiscalizador activo<select [(ngModel)]="fiscalizadorId" name="fiscalizador"><option value="">Seleccionar fiscalizador</option><option *ngFor="let f of fiscalizadores" [value]="f.id">{{f.nombre}} · {{f.zona}}</option></select></label>
+      <p class="hint wide" *ngIf="tipoVisita==='INOPINADA'">Visita inopinada. La fecha y hora son referencias operativas internas.</p>
+    </div></section>
+    <div class="form-actions"><a class="btn-light" routerLink="/expedientes">Cancelar</a><button type="submit" class="btn-primary" [disabled]="guardando">{{guardando?'Guardando…':'Crear expediente'}}</button></div>
+  </form>
+</main>

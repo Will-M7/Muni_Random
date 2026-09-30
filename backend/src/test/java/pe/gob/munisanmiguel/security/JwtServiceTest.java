@@ -11,18 +11,18 @@ class JwtServiceTest {
     @Test
     void creaYValidaClaimsDelToken() {
         JwtService service = new JwtService(SECRET, 15);
-        String token = service.create("municipio", "MUNICIPIO", null);
+        String token = service.create("municipio", null);
 
         var claims = service.parse(token).getPayload();
         assertEquals("municipio", claims.getSubject());
-        assertEquals("MUNICIPIO", claims.get("role", String.class));
+        org.junit.jupiter.api.Assertions.assertFalse(claims.containsKey("role"));
         assertEquals("", claims.get("fiscalizadorId", String.class));
     }
 
     @Test
     void rechazaTokenAlterado() {
         JwtService service = new JwtService(SECRET, 15);
-        String token = service.create("municipio", "MUNICIPIO", null);
+        String token = service.create("municipio", null);
 
         assertThrows(RuntimeException.class, () -> service.parse(token + "x"));
     }

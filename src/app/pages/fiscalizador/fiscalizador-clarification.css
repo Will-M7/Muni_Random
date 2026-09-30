@@ -1,0 +1,6 @@
+.clarification-date{font-size:11px;color:#708078}
+.clarification-actions{display:flex;gap:8px;flex-wrap:wrap}
+.button-secondary{border:1px solid #cbd8ce;border-radius:8px;padding:10px 14px;background:#fff;color:#355b45;font-weight:700;cursor:pointer}
+.button-secondary:disabled{opacity:.55;cursor:default}
+.clarification-task .field-hint{font-size:11px;font-weight:500;color:#68776d}
+@media(max-width:480px){.clarification-actions{display:grid;grid-template-columns:1fr 1fr}.clarification-actions button{min-width:0;padding:10px 8px}}

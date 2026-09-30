@@ -2,7 +2,6 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs/operators';
-import { Rol } from './models/solicitud.model';
 import { AuthService } from './services/auth.service';
 
 @Component({
@@ -12,12 +11,14 @@ import { AuthService } from './services/auth.service';
   styleUrl: './app.css',
 })
 export class App implements OnInit {
-  rolActivo: Rol = 'MUNICIPIO';
   esRutaLogin = false;
-  get esMunicipio(): boolean { return this.authService.session?.rol === 'MUNICIPIO'; }
-  get esFiscalizador(): boolean { return this.authService.session?.rol === 'FISCALIZADOR'; }
+  get esAdmin(): boolean { return this.authService.hasCapability('ROLES_VER'); }
+  get esMunicipio(): boolean { return this.authService.hasCapability('SOLICITUD_VER'); }
+  get esFiscalizador(): boolean { return this.authService.hasCapability('TAREAS_PROPIAS_VER'); }
+  get puedeCrearSolicitud(): boolean { return this.authService.hasCapability('SOLICITUD_CREAR'); }
+  get puedeVerUsuarios(): boolean { return this.authService.hasCapability('USUARIOS_VER'); }
 
-  constructor(private router: Router, private authService: AuthService) {}
+  constructor(private router: Router, public authService: AuthService) {}
 
   ngOnInit(): void {
     this.actualizarEstado();
@@ -31,10 +32,6 @@ export class App implements OnInit {
   actualizarEstado(): void {
     const url = this.router.url;
     this.esRutaLogin = url.includes('login') || url === '/' || url === '';
-    const rolSesion = this.authService.session?.rol;
-    const guardado = localStorage.getItem('rolSM') as Rol;
-    if (rolSesion === 'MUNICIPIO' || rolSesion === 'FISCALIZADOR') this.rolActivo = rolSesion;
-    else if (guardado === 'MUNICIPIO' || guardado === 'FISCALIZADOR') this.rolActivo = guardado;
   }
 
   cerrarSesion(): void {
