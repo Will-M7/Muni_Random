@@ -1,173 +1,36 @@
-.mapa-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px 24px 40px;
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 120px);
-  min-height: 600px;
-  box-sizing: border-box;
-}
-
-.mapa-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.eyebrow {
-  font-size: 11px;
-  font-weight: 800;
-  color: #147c50;
-  letter-spacing: 1.2px;
-  margin: 0 0 4px;
-  text-transform: uppercase;
-  display: block;
-}
-
-.mapa-header h1 {
-  font-size: 26px;
-  font-weight: 800;
-  color: #0f3926;
-  margin: 0 0 4px;
-  letter-spacing: -0.5px;
-}
-
-.mapa-subtitle {
-  margin: 0;
-  font-size: 13px;
-  color: #556c60;
-}
-
-.mapa-actions {
-  display: flex;
-  gap: 10px;
-}
-.mapa-message { margin: 0 0 12px; padding: 10px 12px; color: var(--municipal-danger); background: #fff5f3; border-left: 3px solid var(--municipal-danger); font-size: 12px; }
-
-.btn-back {
-  background: #ffffff;
-  color: #445d50;
-  border: 1.5px solid #cadad0;
-  padding: 10px 18px;
-  border-radius: 8px;
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-back:hover {
-  background: #f0f7f3;
-}
-
-.btn-save-loc {
-  background: #147c50;
-  color: #ffffff;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(20, 124, 80, 0.25);
-  transition: background 0.2s;
-}
-
-.btn-save-loc:hover {
-  background: #0f633f;
-}
-
-.coords-bar {
-  background: #ffffff;
-  border: 1px solid #dfe9e1;
-  border-radius: 10px;
-  padding: 12px 18px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 14px;
-  font-size: 13px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
-}
-
-.coords-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #3b5045;
-}
-
-.coords-dot {
-  color: #a0b3a8;
-  font-size: 16px;
-}
-
-.coords-dot.active {
-  color: #147c50;
-}
-
-.coords-info code {
-  background: #f0f7f3;
-  border: 1px solid #cce2d5;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-family: monospace;
-  font-weight: bold;
-  color: #113a27;
-}
-
-.distrito-badge {
-  background: #eef7f2;
-  color: #147c50;
-  font-size: 11px;
-  font-weight: 800;
-  padding: 4px 10px;
-  border-radius: 20px;
-}
-
-.map-wrapper {
-  flex: 1;
-  border: 2px solid #d4ebdc;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 8px 24px rgba(20, 124, 80, 0.08);
-  position: relative;
-  min-height: 450px;
-}
-
-.map-search { margin: 0 0 12px; }
-.map-search form { max-width: 720px; }
-.map-search form label { display: block; margin-bottom: 6px; color: #31483b; font-size: 13px; font-weight: 700; }
-.map-search form > div { display: flex; gap: 8px; }
-.map-search input { flex: 1; min-width: 0; border: 1px solid #cbd9d0; border-radius: 7px; padding: 10px 12px; font: inherit; color: #20372a; background: white; }
-.map-search button { border: 0; border-radius: 7px; background: #176a4b; color: white; padding: 10px 16px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-.map-search button:disabled { opacity: .65; cursor: wait; }
-.map-search ul { list-style: none; max-width: 720px; padding: 0; margin: 6px 0 0; background: #fff; border: 1px solid #dce7df; border-radius: 7px; overflow: hidden; }
-.map-search li + li { border-top: 1px solid #edf1ee; }
-.map-search li button { width: 100%; text-align: left; background: white; color: #315044; font-weight: 500; }
-.map-search li button:hover { background: #f1f7f3; }
-
-#mapa {
-  width: 100%;
-  height: 100%;
-  min-height: 450px;
-  background: #e8ede9;
-}
-
-@media (max-width: 640px) {
-  .mapa-container { height: auto; min-height: calc(100vh - 120px); padding: 18px 14px 28px; }
-  .mapa-header { gap: 12px; }
-  .mapa-header h1 { font-size: 22px; }
-  .mapa-actions { width: 100%; flex-wrap: wrap; }
-  .mapa-actions button { flex: 1; padding: 10px 9px; }
-  .coords-bar { align-items: flex-start; flex-direction: column; gap: 9px; padding: 11px 12px; }
-  .coords-info { align-items: flex-start; flex-wrap: wrap; gap: 7px; }
-  .coords-info strong { flex: 1; min-width: 160px; }
-  .coords-info code { max-width: 100%; overflow-wrap: anywhere; }
-  .map-wrapper { min-height: 420px; }
-  #mapa { min-height: 420px; }
-}
+:host{display:block;min-height:calc(100vh - 56px)}
+.mapa-container{min-height:calc(100vh - 56px);padding:26px clamp(16px,4.2vw,68px) 32px;display:flex;box-sizing:border-box;background:linear-gradient(180deg,rgba(10,37,27,.12),rgba(10,37,27,.18)),url('/assets/imagenes/municipalidad-san-miguel.png') center/cover fixed no-repeat}
+.mapa-panel{width:100%;max-width:1500px;min-height:calc(100vh - 114px);margin:auto;padding:24px 28px 26px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box;background:rgba(249,252,249,.9);border:1px solid rgba(255,255,255,.85);border-radius:18px;box-shadow:0 18px 54px rgba(10,42,29,.18);backdrop-filter:blur(10px)}
+.mapa-header{display:flex;justify-content:space-between;align-items:center;gap:28px}
+.mapa-title-block{min-width:0}
+.btn-back{display:inline-flex;align-items:center;gap:7px;margin:0 0 16px;padding:0;border:0;background:transparent;color:#087052;font-size:14px;font-weight:750;cursor:pointer}
+.btn-back svg{width:17px;height:17px}
+.eyebrow{display:block;margin:0 0 5px;color:#147452;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase}
+.mapa-header h1{margin:0;color:#073b31;font-size:clamp(28px,2.6vw,38px);font-weight:850;letter-spacing:-1px;line-height:1.12}
+.mapa-subtitle{margin:7px 0 0;color:#536981;font-size:14px;line-height:1.45}
+.btn-save-loc{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-width:205px;min-height:48px;padding:11px 17px;flex:none;border:0;border-radius:10px;background:#07835f;color:#fff;font-size:14px;font-weight:750;box-shadow:0 5px 14px rgba(7,131,95,.2);cursor:pointer;transition:background .15s,transform .15s}
+.btn-save-loc:hover{background:#05694c;transform:translateY(-1px)}.btn-save-loc svg{width:19px;height:19px}
+.mapa-message{margin:0;padding:11px 14px;border:1px solid #f0c5c1;border-radius:9px;background:#fff3f2;color:#9b2d27;font-size:13px}
+.map-controls{display:grid;grid-template-columns:minmax(0,1fr) 235px;gap:12px;align-items:stretch}
+.map-search{position:relative;min-width:0;padding:14px 16px;background:rgba(255,255,255,.94);border:1px solid #e1eae5;border-radius:12px;box-shadow:0 3px 10px rgba(19,59,39,.035)}
+.map-search form label{display:block;margin:0 0 7px;color:#214339;font-size:13px;font-weight:750}
+.map-search-row{display:flex;gap:9px}
+.map-search input{flex:1;min-width:0;height:44px;padding:0 13px;border:1px solid #ccd9e2;border-radius:8px;background:#fff;color:#18304a;font:inherit;font-size:14px;outline:0}
+.map-search input:focus{border-color:#158367;box-shadow:0 0 0 3px rgba(21,131,103,.13)}.map-search input::placeholder{color:#8291a3}
+.map-search form button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:112px;padding:0 15px;border:0;border-radius:8px;background:#07835f;color:#fff;font:inherit;font-size:14px;font-weight:750;cursor:pointer}
+.map-search form button:hover:not(:disabled){background:#05694c}.map-search form button:disabled{opacity:.65;cursor:wait}.map-search form button svg{width:18px;height:18px}
+.map-search ul{position:absolute;z-index:600;top:calc(100% - 4px);left:14px;right:14px;max-height:230px;overflow:auto;list-style:none;margin:0;padding:0;background:#fff;border:1px solid #dbe6df;border-radius:9px;box-shadow:0 8px 22px rgba(20,48,34,.14)}
+.map-search li+li{border-top:1px solid #edf1ee}.map-search li button{width:100%;padding:10px 12px;border:0;background:#fff;color:#2b4d3d;text-align:left;font:inherit;font-size:12px;cursor:pointer}.map-search li button:hover{background:#f1f8f4}
+.district-card{display:flex;align-items:center;gap:11px;min-width:0;padding:12px;border:1px solid #d5e9dd;border-radius:12px;background:rgba(243,250,246,.96);color:#124532;text-decoration:none;transition:border-color .15s,background .15s}
+.district-card:hover{border-color:#94c9ac;background:#ecf7f0}
+.district-pin{width:42px;height:42px;display:grid;place-items:center;flex:none;border-radius:50%;background:#dcefe4;color:#087052}.district-pin svg{width:23px;height:23px}
+.district-card>span:last-child{display:grid;gap:2px;min-width:0}.district-card strong{font-size:13px;line-height:1.25}.district-card small{color:#60758a;font-size:12px}.district-card em{margin-top:3px;color:#087052;font-size:11px;font-style:normal;font-weight:700}
+.coords-bar{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 14px;border:1px solid #d5e9dd;border-radius:11px;background:rgba(244,250,246,.84)}
+.coords-info{display:flex;align-items:center;flex-wrap:wrap;gap:9px;color:#294a3b;font-size:13px}.coords-pin{width:22px;height:22px;color:#07835f}.coords-pin svg{width:22px;height:22px}
+.coords-info strong{font-size:13px}.coords-info code{padding:5px 9px;border:1px solid #c3ddce;border-radius:7px;background:#f7fcf8;color:#174b35;font-family:ui-monospace,Consolas,monospace;font-size:12px;font-weight:700}
+.selection-status{flex:none;padding:6px 10px;border:1px solid #dbe4df;border-radius:20px;background:#fff;color:#69796f;font-size:11px;font-weight:700}.selection-status.active{border-color:#bfe5cd;background:#e5f6eb;color:#087044}
+.map-wrapper{position:relative;flex:1;min-height:380px;overflow:hidden;border:1px solid #cbded3;border-radius:13px;background:#e8ede9;box-shadow:0 5px 16px rgba(20,64,42,.09)}
+#mapa{width:100%;height:100%;min-height:380px;background:#e8ede9}
+@media(max-width:900px){.mapa-container{padding:17px}.mapa-panel{min-height:calc(100vh - 90px);padding:20px;gap:12px}.map-controls{grid-template-columns:minmax(0,1fr) 210px}.map-wrapper,#mapa{min-height:420px}}
+@media(max-width:650px){.mapa-container{padding:12px;min-height:calc(100vh - 56px);background-attachment:scroll}.mapa-panel{min-height:calc(100vh - 80px);padding:16px 13px;border-radius:13px}.mapa-header{align-items:flex-start;flex-direction:column;gap:13px}.btn-back{margin-bottom:12px}.mapa-header h1{font-size:27px}.mapa-subtitle{font-size:13px}.btn-save-loc{width:100%;min-height:44px}.map-controls{grid-template-columns:1fr}.map-search{padding:12px}.map-search-row{gap:7px}.map-search input{height:42px;padding:0 10px;font-size:13px}.map-search form button{min-width:94px;padding:0 10px;font-size:13px}.district-card{padding:10px}.coords-bar{align-items:flex-start;flex-direction:column;padding:10px;gap:9px}.coords-info{gap:7px}.coords-info strong{flex-basis:calc(100% - 34px)}.coords-info code{max-width:100%;font-size:10px;overflow-wrap:anywhere}.map-wrapper,#mapa{min-height:420px}}
+@media(max-width:380px){.coords-info strong{flex-basis:100%}.map-search-row{flex-direction:column}.map-search form button{min-height:40px}}

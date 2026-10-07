@@ -1,7 +1,68 @@
-<main class="expedientes-page review-page">
-  <a class="back" routerLink="/expedientes">‹ Volver a Fiscalizaciones</a>
-  <header class="page-head"><div><p class="eyebrow">MUNICIPALIDAD DISTRITAL DE SAN MIGUEL · REVISIÓN MUNICIPAL</p><h1>Pendientes de revisión</h1><p>Revisa diligencias finalizadas, actas y evidencias antes de registrar una conclusión.</p></div><button type="button" class="btn-light" (click)="cargar()" [disabled]="cargando">Actualizar</button></header>
-  <section class="review-filters"><label>Fecha de diligencia<input type="date" [(ngModel)]="fecha"></label><label>Fiscalizador<select [(ngModel)]="fiscalizador"><option value="">Todos</option><option *ngFor="let x of fiscalizadores" [value]="x">{{x}}</option></select></label><label>Origen<select [(ngModel)]="origen"><option value="">Todos</option><option value="SOLICITUD">Solicitud</option><option value="DENUNCIA">Denuncia</option><option value="INICIATIVA_MUNICIPAL">Iniciativa municipal</option><option value="ORDEN_SUPERIOR">Orden superior</option><option value="OPERATIVO_PROGRAMADO">Operativo programado</option><option value="OPERATIVO_INOPINADO">Operativo inopinado</option><option value="OTRO">Otro</option></select></label><label>Resultado<select [(ngModel)]="resultado"><option value="">Todos</option><option value="REALIZADA">Realizada</option><option value="NO_REALIZADA">No realizada</option></select></label><label>Estado de revisión<select [(ngModel)]="estado"><option value="">Todos</option><option value="PENDIENTE">Pendiente</option><option value="EN_REVISION">En revisión</option><option value="REQUIERE_ACLARACION">Requiere aclaración</option></select></label></section>
-  <p class="error" *ngIf="error" role="alert">{{error}}</p><p class="loading" *ngIf="cargando">Cargando diligencias…</p>
-  <section class="review-list" *ngIf="!cargando"><article class="review-row" *ngFor="let x of filtrados"><div class="review-case"><div class="review-title"><strong>{{x.expedienteCodigo}}</strong><span class="pill">{{x.estadoRevision==='PENDIENTE'?'Pendiente':x.estadoRevision==='EN_REVISION'?'En revisión':'Requiere aclaración'}}</span></div><h2>{{x.administrado||'Administrado sin identificar'}}</h2><p>{{x.objeto}}</p></div><dl><div><dt>Origen</dt><dd>{{x.origen}}</dd></div><div><dt>Fiscalizador</dt><dd>{{x.fiscalizador}}</dd></div><div><dt>Diligencia</dt><dd>{{x.fechaCierre|date:'dd/MM/yyyy HH:mm'}}</dd></div><div><dt>Tipo de visita</dt><dd>{{x.tipoVisita}}</dd></div><div><dt>Resultado</dt><dd>{{x.resultado==='REALIZADA'?'Realizada':'No realizada'}}</dd></div><div><dt>Evidencias</dt><dd>{{x.cantidadEvidencias}}</dd></div><div><dt>Acta</dt><dd>{{x.actaCodigo||'—'}}</dd></div><div><dt>Antigüedad</dt><dd>{{x.antiguedadHoras}} h</dd></div></dl><button class="btn-primary" type="button" (click)="revisar(x)">{{x.estadoRevision==='PENDIENTE'?'Revisar fiscalización':x.estadoRevision==='EN_REVISION'?'Continuar revisión':'Ver revisión'}}</button></article><p class="empty" *ngIf="!filtrados.length">No hay diligencias pendientes de revisión con estos filtros.</p></section>
+<main class="expedientes-page review-page review-inbox">
+  <div class="review-hero">
+    <a class="back" routerLink="/expedientes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m15 18-6-6 6-6"/><path d="M20 12H9"/></svg>
+      Volver a Fiscalizaciones
+    </a>
+    <header class="review-heading">
+      <div>
+        <p class="eyebrow">MUNICIPALIDAD DISTRITAL DE SAN MIGUEL · REVISIÓN MUNICIPAL</p>
+        <h1>Pendientes de revisión</h1>
+        <p class="review-description">Revisa diligencias finalizadas, actas y evidencias antes de registrar una conclusión.</p>
+      </div>
+      <button type="button" class="review-refresh" (click)="cargar()" [disabled]="cargando">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9a7 7 0 0 1 11.8-2L20 12M4 12l2.6 5a7 7 0 0 0 11.8-2"/></svg>
+        Actualizar
+      </button>
+    </header>
+  </div>
+
+  <section class="review-filters" aria-label="Filtros de revisión">
+    <label>
+      <span class="review-filter-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Fecha de diligencia</span>
+      <input type="date" [(ngModel)]="fecha">
+    </label>
+    <label>
+      <span class="review-filter-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Fiscalizador</span>
+      <select [(ngModel)]="fiscalizador"><option value="">Todos</option><option *ngFor="let x of fiscalizadores" [value]="x">{{x}}</option></select>
+    </label>
+    <label>
+      <span class="review-filter-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 10 5-10 5L2 7l10-5Z"/><path d="m2 12 10 5 10-5M2 17l10 5 10-5"/></svg>Origen</span>
+      <select [(ngModel)]="origen"><option value="">Todos</option><option value="SOLICITUD">Solicitud</option><option value="DENUNCIA">Denuncia</option><option value="INICIATIVA_MUNICIPAL">Iniciativa municipal</option><option value="ORDEN_SUPERIOR">Orden superior</option><option value="OPERATIVO_PROGRAMADO">Operativo programado</option><option value="OPERATIVO_INOPINADO">Operativo inopinado</option><option value="OTRO">Otro</option></select>
+    </label>
+    <label>
+      <span class="review-filter-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19v-5M10 19V5m6 14v-8m6 8V9"/></svg>Resultado</span>
+      <select [(ngModel)]="resultado"><option value="">Todos</option><option value="REALIZADA">Realizada</option><option value="NO_REALIZADA">No realizada</option></select>
+    </label>
+    <label>
+      <span class="review-filter-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg>Estado de revisión</span>
+      <select [(ngModel)]="estado"><option value="">Todos</option><option value="PENDIENTE">Pendiente</option><option value="EN_REVISION">En revisión</option><option value="REQUIERE_ACLARACION">Requiere aclaración</option></select>
+    </label>
+  </section>
+
+  <p class="error" *ngIf="error" role="alert">{{error}}</p>
+  <p class="loading" *ngIf="cargando">Cargando diligencias…</p>
+  <section class="review-list" *ngIf="!cargando" aria-label="Diligencias para revisión">
+    <article class="review-row" *ngFor="let x of filtrados">
+      <div class="review-case">
+        <div class="review-title"><strong>{{x.expedienteCodigo}}</strong><span class="pill">{{x.estadoRevision==='PENDIENTE'?'Pendiente':x.estadoRevision==='EN_REVISION'?'En revisión':'Requiere aclaración'}}</span></div>
+        <h2>{{x.administrado||'Administrado sin identificar'}}</h2><p>{{x.objeto}}</p>
+      </div>
+      <dl><div><dt>Origen</dt><dd>{{origenNombre(x.origen)}}</dd></div><div><dt>Fiscalizador</dt><dd>{{x.fiscalizador}}</dd></div><div><dt>Diligencia</dt><dd>{{x.fechaCierre|date:'dd/MM/yyyy HH:mm'}}</dd></div><div><dt>Tipo de visita</dt><dd>{{x.tipoVisita}}</dd></div><div><dt>Resultado</dt><dd>{{x.resultado==='REALIZADA'?'Realizada':'No realizada'}}</dd></div><div><dt>Evidencias</dt><dd>{{x.cantidadEvidencias}}</dd></div><div><dt>Acta</dt><dd>{{x.actaCodigo||'—'}}</dd></div><div><dt>Antigüedad</dt><dd>{{x.antiguedadHoras}} h</dd></div></dl>
+      <button class="review-open" type="button" (click)="revisar(x)">{{x.estadoRevision==='PENDIENTE'?'Revisar fiscalización':x.estadoRevision==='EN_REVISION'?'Continuar revisión':'Ver revisión'}}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+    </article>
+    <div class="review-empty" *ngIf="!filtrados.length">
+      <svg class="review-empty-art" viewBox="0 0 280 150" fill="none" aria-hidden="true">
+        <path d="M42 125c8-20 27-31 47-26 11-24 42-28 60-10 17-20 50-17 61 7 20-7 39 5 45 29H42Z" fill="#eaf5ef"/>
+        <circle cx="142" cy="68" r="48" fill="#f1f8f4"/>
+        <rect x="110" y="29" width="62" height="83" rx="12" fill="#d8eee3"/>
+        <path d="M125 50h32M125 65h32M125 80h22" stroke="#78b99a" stroke-width="7" stroke-linecap="round"/>
+        <circle cx="164" cy="94" r="17" fill="#f1f8f4" stroke="#07563d" stroke-width="6"/>
+        <path d="m177 107 13 13" stroke="#07563d" stroke-width="7" stroke-linecap="round"/>
+        <path d="M76 111c-2-13 1-24 9-31 8 10 9 20 5 31m-16-12c8 0 15 3 20 9m113 2c-2-12 1-22 9-29 8 9 9 19 5 29m-16-10c8 0 15 3 20 9" stroke="#9bcdb4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M89 58h-9m91-19 6-7m34 28 8-3" stroke="#9bcdb4" stroke-width="4" stroke-linecap="round"/>
+      </svg>
+      <p>No hay diligencias pendientes de revisión con estos filtros.</p>
+    </div>
+  </section>
 </main>

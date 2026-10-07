@@ -1,1 +1,57 @@
 .location-actions{display:flex;flex-wrap:wrap;gap:8px}
+
+/* Formulario de alta de expedientes */
+.form-page{padding:24px clamp(20px,3.4vw,58px) 64px;background-size:100% auto;background-attachment:scroll}
+.form-page>.back{display:inline-flex;align-items:center;gap:6px;margin:0 0 20px;color:#087052;font-size:14px;font-weight:750}
+.form-page>.back svg{width:16px;height:16px}
+.form-page>.page-head{align-items:flex-start;margin:0 auto 24px;max-width:1500px}
+.form-page>.page-head .eyebrow{color:#294f44;font-size:14px;font-weight:700;letter-spacing:.02em;margin:0 0 8px}
+.form-page>.page-head h1{font-size:clamp(34px,3.2vw,48px);font-weight:850;line-height:1.08;letter-spacing:-1.4px;color:#073b31;margin:0}
+.form-page>.page-head p:not(.eyebrow){font-size:18px;color:#5e7186;margin:10px 0 0}
+.expediente-form{max-width:1500px;margin:0 auto;display:grid;gap:14px}
+.form-page .form-section{padding:18px 24px 20px;background:rgba(255,255,255,.96);border:1px solid rgba(255,255,255,.88);border-radius:16px;box-shadow:0 5px 18px rgba(24,66,45,.07)}
+.form-section-heading{display:flex;align-items:center;gap:14px;margin:0 0 15px}
+.form-section-heading>div{min-width:0}
+.form-section-icon{width:52px;height:52px;display:grid;place-items:center;flex:none;border-radius:50%;background:#e0f2e8;color:#087052}
+.form-section-icon svg{width:25px;height:25px}
+.form-page .form-section h2{font-size:24px;line-height:1.2;letter-spacing:-.35px;color:#0b3d32;margin:0;font-weight:800}
+.form-section-heading p{color:#63758b!important;font-size:14px!important;margin:3px 0 0!important}
+.form-grid{display:grid;gap:13px 18px;align-items:end}
+.origin-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.admin-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+.expediente-form label{display:grid;gap:7px;min-width:0;color:#283b54;font-size:14px;font-weight:650}
+.expediente-form input:not([type=checkbox]):not([type=file]),.expediente-form select,.expediente-form textarea{display:block;width:100%;min-width:0;min-height:42px;padding:9px 12px;border:1px solid #cfdae2;border-radius:8px;background:rgba(255,255,255,.94);color:#172f49;font:inherit;font-size:14px;font-weight:500;box-shadow:0 1px 2px rgba(24,51,74,.03);transition:border-color .15s,box-shadow .15s}
+.expediente-form textarea{min-height:74px;resize:vertical;line-height:1.4}
+.expediente-form input::placeholder,.expediente-form textarea::placeholder{color:#8493a5}
+.expediente-form input:focus,.expediente-form select:focus,.expediente-form textarea:focus{outline:0;border-color:#138365;box-shadow:0 0 0 3px rgba(19,131,101,.13)}
+.required-mark{color:#d92d20;margin-left:-4px}
+.dni-group{grid-column:span 2;display:grid;grid-template-columns:minmax(130px,.9fr) minmax(150px,1fr);align-items:end;gap:14px}
+.inline-field{display:grid;gap:6px;align-content:end;min-width:0}
+.inline-field small{color:#55705f;font-size:11px;line-height:1.35}
+.expediente-form .btn-light{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:9px 13px;border:1px solid #178364;border-radius:8px;background:#fff;color:#087052;text-decoration:none;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s,transform .15s}
+.expediente-form .btn-light:hover{background:#f0f8f3;transform:translateY(-1px)}
+.expediente-form .btn-light svg{width:19px;height:19px;flex:none}
+.location-box{display:flex;align-items:center;justify-content:space-between;gap:18px}
+.location-actions{display:flex;flex-wrap:wrap;gap:10px}
+.form-page .hint{margin:0;color:#6b7c91;font-size:12px;line-height:1.5}
+.location-box>.hint{max-width:520px}
+.form-page .file-label{max-width:540px}
+.form-page input[type=file]{width:100%;padding:11px;border:1px dashed #b8ccc1;border-radius:9px;background:#f8fbf9;color:#415b4e;font-size:13px}
+.file-name{display:block;margin:8px 0 0 2px;color:#64758a;font-size:12px}
+.check-row{display:flex!important;align-items:center;gap:12px!important;width:max-content;max-width:100%;cursor:pointer}
+.check-row input{width:19px;height:19px;accent-color:#087052}
+.check-row .form-section-icon{width:44px;height:44px}
+.check-row .form-section-icon svg{width:21px;height:21px}
+.check-row>span:last-child{display:grid;gap:3px}
+.check-row b{color:#0b3d32;font-size:17px}
+.check-row small{color:#697b8f;font-size:13px;font-weight:500}
+.schedule-fields{grid-template-columns:repeat(4,minmax(0,1fr));margin:18px 0 0;padding-top:17px;border-top:1px solid #e7eeea}
+.schedule-fields .wide{grid-column:1/-1}
+.form-page .error{max-width:1500px;margin:0 auto 14px;padding:12px 15px;border:1px solid #f0b9b5;border-radius:9px;background:#fff2f0;color:#a12b24;font-size:14px}
+.form-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:3px}
+.form-actions .btn-light,.form-actions .btn-primary{min-height:44px;padding:11px 18px;border-radius:9px;font-size:14px;font-weight:750}
+.form-actions .btn-primary{border:1px solid #087052;background:#087052;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(8,112,82,.16)}
+.form-actions .btn-primary:hover:not(:disabled){background:#056248}.form-actions .btn-primary:disabled{opacity:.6;cursor:wait}
+@media(max-width:1050px){.origin-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.schedule-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.dni-group{grid-column:span 2}}
+@media(max-width:680px){.form-page{padding:18px 15px 40px}.form-page>.back{margin-bottom:18px}.form-page>.page-head{margin-bottom:19px}.form-page>.page-head h1{font-size:34px}.form-page>.page-head p:not(.eyebrow){font-size:15px}.expediente-form{gap:11px}.form-page .form-section{padding:15px}.form-section-heading{gap:11px;margin-bottom:13px}.form-section-icon{width:44px;height:44px}.form-section-icon svg{width:22px;height:22px}.form-page .form-section h2{font-size:20px}.form-section-heading p{font-size:12px!important}.origin-grid,.admin-grid,.schedule-fields{grid-template-columns:1fr}.dni-group{grid-column:auto;grid-template-columns:minmax(110px,.8fr) minmax(145px,1fr);gap:9px}.expediente-form label{font-size:13px}.location-box{align-items:flex-start;flex-direction:column}.location-actions{width:100%}.location-actions .btn-light{flex:1}.schedule-fields .wide{grid-column:auto}.form-actions{justify-content:stretch}.form-actions>*{flex:1;text-align:center}}
+@media(max-width:390px){.dni-group{grid-template-columns:1fr}.inline-field{align-content:start}.location-actions{flex-direction:column}.location-actions .btn-light{width:100%}}

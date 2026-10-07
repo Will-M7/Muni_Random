@@ -1,41 +1,54 @@
 <main class="mapa-container">
-  <header class="mapa-header">
-    <div class="mapa-title">
-      <span class="eyebrow">MUNICIPALIDAD DISTRITAL DE SAN MIGUEL · GEORREFERENCIACIÓN</span>
-      <h1>Seleccionar ubicación del predio</h1>
-      <p class="mapa-subtitle">
-        {{ solicitanteNombre ? 'Fijando ubicación para: ' + solicitanteNombre + ' (' + direccionPredio + ')' : 'Busca una dirección o selecciona el punto exacto del predio.' }}
-      </p>
-    </div>
-
-    <div class="mapa-actions">
-      <button type="button" class="btn-back" (click)="volver()">
-        {{ origenRuta === 'expedientes/nuevo' ? 'Volver al expediente' : 'Volver a la solicitud' }}
-      </button>
+  <section class="mapa-panel">
+    <header class="mapa-header">
+      <div class="mapa-title-block">
+        <button type="button" class="btn-back" (click)="volver()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m15 18-6-6 6-6"/><path d="M20 12H9"/></svg>
+          {{ origenRuta === 'expedientes/nuevo' ? 'Volver al expediente' : 'Volver a la solicitud' }}
+        </button>
+        <span class="eyebrow">MUNICIPALIDAD DISTRITAL DE SAN MIGUEL · GEOREFERENCIACIÓN</span>
+        <h1>Seleccionar ubicación del predio</h1>
+        <p class="mapa-subtitle">
+          {{ solicitanteNombre ? 'Fijando ubicación para: ' + solicitanteNombre + ' (' + direccionPredio + ')' : 'Busca una dirección o selecciona el punto exacto del predio.' }}
+        </p>
+      </div>
       <button type="button" class="btn-save-loc" (click)="guardarUbicacion()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9a7 7 0 0 1 11.8-2L20 12M4 12l2.6 5a7 7 0 0 0 11.8-2"/></svg>
         Confirmar ubicación
       </button>
+    </header>
+
+    <p class="mapa-message" *ngIf="mapaMensaje" role="alert">{{ mapaMensaje }}</p>
+
+    <div class="map-controls">
+      <section class="map-search">
+        <form (ngSubmit)="buscarUbicacion()">
+          <label for="map-search-input">Buscar dirección o lugar</label>
+          <div class="map-search-row">
+            <input id="map-search-input" [(ngModel)]="terminoBusqueda" name="terminoBusqueda" placeholder="Ej. Jr. Tumbes, San Miguel - San Román, Puno" />
+            <button type="submit" [disabled]="buscando">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg>
+              {{ buscando ? 'Buscando...' : 'Buscar' }}
+            </button>
+          </div>
+        </form>
+        <ul *ngIf="resultadosBusqueda.length"><li *ngFor="let resultado of resultadosBusqueda"><button type="button" (click)="seleccionarResultado(resultado)">{{ resultado.display_name }}</button></li></ul>
+      </section>
+      <a class="district-card" href="https://www.google.com/maps/place/San+Miguel/@-15.5333749,-70.1545063,12z/data=!4m6!3m5!1s0x9167edefd33ff775:0x21c8115a6eecee79!8m2!3d-15.3977773!4d-70.1217652!16s%2Fg%2F11vdvglkz8?entry=ttu&amp;g_ep=EgoyMDI2MTAwNC4wIKXMDSoASAFQAw%3D%3D" target="_blank" rel="noopener noreferrer">
+        <span class="district-pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+        <span><strong>Distrito de San Miguel</strong><small>San Román · Puno</small><em>Ver en Google Maps ↗</em></span>
+      </a>
     </div>
-  </header>
 
-  <p class="mapa-message" *ngIf="mapaMensaje" role="alert">{{ mapaMensaje }}</p>
-
-  <section class="map-search"><form (ngSubmit)="buscarUbicacion()"><label for="map-search-input">Buscar dirección o lugar</label><div><input id="map-search-input" [(ngModel)]="terminoBusqueda" name="terminoBusqueda" placeholder="Ej. Jr. Federico Gallese 370, San Miguel" /><button type="submit" [disabled]="buscando">{{ buscando ? 'Buscando...' : 'Buscar' }}</button></div></form><ul *ngIf="resultadosBusqueda.length"><li *ngFor="let resultado of resultadosBusqueda"><button type="button" (click)="seleccionarResultado(resultado)">{{ resultado.display_name }}</button></li></ul></section>
-
-  <!-- BARRA DE COORDENADAS -->
-  <div class="coords-bar">
-    <div class="coords-info">
-      <span class="coords-dot" [class.active]="coordenadasSeleccionadas">●</span>
-      <strong>
-        {{ coordenadasSeleccionadas ? 'Punto geográfico fijado:' : 'Selecciona un punto en el mapa:' }}
-      </strong>
-      <code>Latitud: {{ latitudActual.toFixed(6) }} | Longitud: {{ longitudActual.toFixed(6) }}</code>
+    <div class="coords-bar">
+      <div class="coords-info">
+        <span class="coords-pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+        <strong>{{ coordenadasSeleccionadas ? 'Punto geográfico fijado:' : 'Selecciona un punto en el mapa:' }}</strong>
+        <code>Latitud: {{ latitudActual.toFixed(6) }} | Longitud: {{ longitudActual.toFixed(6) }}</code>
+      </div>
+      <span class="selection-status" [class.active]="coordenadasSeleccionadas">{{ coordenadasSeleccionadas ? 'Punto seleccionado' : 'Esperando selección' }}</span>
     </div>
-    <span class="distrito-badge">Distrito de San Miguel · Lima</span>
-  </div>
 
-  <!-- CONTENEDOR LEAFLET -->
-  <div class="map-wrapper">
-    <div id="mapa"></div>
-  </div>
+    <div class="map-wrapper"><div id="mapa"></div></div>
+  </section>
 </main>

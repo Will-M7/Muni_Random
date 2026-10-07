@@ -4,8 +4,8 @@ import { firstValueFrom, Observable } from 'rxjs';
 import { EstadoSolicitud, Solicitud, Fiscalizador, ResultadoFiscalizacion } from '../models/solicitud.model';
 import { environment } from '../../environments/environment';
 
-// Coordenadas del distrito de San Miguel, Lima (centro aproximado distrital).
-export const MUNICIPALIDAD_SAN_MIGUEL_COORDS: [number, number] = [-12.077261, -77.092869];
+// Coordenadas de San Miguel, provincia de San Román, Puno (enlace municipal compartido).
+export const MUNICIPALIDAD_SAN_MIGUEL_COORDS: [number, number] = [-15.3977773, -70.1217652];
 interface SolicitudPayload extends Partial<Solicitud> {}
 export interface ProgramacionDia { codigo: string; horaFiscalizacion: string; ciudadano: string; fiscalizador: string; estado: string; }
 export interface FiscalizadorTarea { codigo:string; ciudadano:string; dni:string; telefono:string; direccion:string; referencia:string; fecha:string; hora:string; latitud:number; longitud:number; documento:string; resultado:'PENDIENTE'|'REALIZADA'|'NO_REALIZADA'; observaciones?:string; observacionesFiscalizador?:string; observacionesMunicipales?:string; reporteNombreOriginal?:string; reporteTamano?:number; fechaEjecucion?:string; estadoSolicitud:string; esExpediente?:boolean; objetoFiscalizacion?:string; estadoProgramacion?:string; tipoVisita?:string; origen?:string; programacionId?:number; diligenciaId?:number|null; estadoDiligencia?:string|null; }

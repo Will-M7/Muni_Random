@@ -1,16 +1,533 @@
-.login-viewport { min-height: 100vh; display: grid; place-items: center; padding: 32px 20px; background: var(--municipal-background); }
-.login-shell { width: min(1080px, 100%); min-height: 640px; display: grid; grid-template-columns: .92fr 1.08fr; background: var(--municipal-surface); border: 1px solid var(--municipal-border); box-shadow: 0 24px 55px rgba(6,78,26,.12); }
-.login-identity { position: relative; overflow: hidden; padding: 42px; color: #fff; background: var(--municipal-primary-deep); display: flex; flex-direction: column; }
-.login-identity::after { content: ''; position: absolute; width: 280px; height: 280px; border: 1px solid rgba(242,196,0,.35); border-radius: 50%; right: -110px; bottom: -100px; box-shadow: 0 0 0 26px rgba(242,196,0,.06), 0 0 0 52px rgba(242,196,0,.04); }
-.identity-topline, .identity-kicker, .eyebrow { font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
-.identity-topline { color: #d9edcf; }.login-logo { width: 126px; height: 126px; object-fit: cover; border-radius: 50%; margin: 56px 0 42px; border: 4px solid var(--municipal-secondary); background: #fff; }
-.identity-copy { max-width: 360px; margin-top: auto; }.identity-kicker, .eyebrow { color: var(--municipal-primary); margin: 0 0 12px; }.login-identity .identity-kicker { color: var(--municipal-secondary); }
-.identity-copy h1 { font-size: clamp(34px, 4vw, 48px); line-height: .98; letter-spacing: -2px; margin: 0 0 20px; font-weight: 800; }.identity-copy h1 span { color: var(--municipal-secondary); }
-.identity-copy p:not(.identity-kicker) { color: #d0e3d0; line-height: 1.6; max-width: 300px; margin: 0; }.identity-rule { width: 54px; border-top: 3px solid var(--municipal-secondary); margin: 44px 0 12px; }.login-identity small { color: #b7d0b8; font-size: 11px; }
-.login-form-container { padding: clamp(34px, 6vw, 76px); display: flex; flex-direction: column; justify-content: center; }.login-heading { margin-bottom: 32px; }.login-heading h2 { margin: 0 0 8px; font-size: 34px; letter-spacing: -1px; color: var(--municipal-primary-deep); }.login-heading > p:last-child { margin: 0; color: var(--municipal-muted); font-size: 14px; }
-.login-fields { display: flex; flex-direction: column; gap: 20px; max-width: 420px; }.form-group { display: flex; flex-direction: column; gap: 7px; }.form-group label, .remember-box { color: var(--municipal-text); font-size: 12px; font-weight: 700; }
-.form-group input { width: 100%; padding: 14px 15px; color: var(--municipal-text); background: #fbfcfa; border: 1px solid var(--municipal-border); border-radius: var(--radius-md); outline: none; transition: border-color .18s, box-shadow .18s, background .18s; }.form-group input:focus { background: white; border-color: var(--municipal-primary); box-shadow: var(--focus-ring); }
-.label-row { display: flex; justify-content: space-between; align-items: center; }.btn-toggle-pass { border: 0; background: transparent; color: var(--municipal-primary-dark); font-size: 11px; font-weight: 800; cursor: pointer; padding: 0; }.remember-box { display: flex; align-items: center; gap: 8px; color: var(--municipal-muted); font-weight: 500; }.remember-box input { accent-color: var(--municipal-primary); }
-.btn-submit-login { margin-top: 6px; padding: 14px 18px; border: 0; border-radius: var(--radius-md); color: #fff; background: var(--municipal-primary); font-weight: 800; cursor: pointer; transition: background .18s, transform .18s; }.btn-submit-login:hover:not(:disabled) { background: var(--municipal-primary-dark); transform: translateY(-1px); }.btn-submit-login:disabled { opacity: .65; cursor: wait; }
-.alert { padding: 11px 14px; margin: 0 0 18px; border-left: 3px solid; font-size: 12px; }.alert p { margin: 0; }.alert-error { color: var(--municipal-danger); background: #fff5f3; border-color: var(--municipal-danger); }.alert-success { color: var(--municipal-success); background: #eef9ef; border-color: var(--municipal-success); }.form-footer-note { margin: 42px 0 0; color: var(--municipal-muted); font-size: 11px; }
-@media (max-width: 760px) { .login-shell { grid-template-columns: 1fr; min-height: auto; }.login-identity { min-height: 270px; padding: 28px; }.login-logo { width: 74px; height: 74px; margin: 25px 0 20px; }.identity-copy { margin-top: 0; }.identity-copy h1 { font-size: 32px; }.identity-rule, .login-identity small { display: none; }.login-form-container { padding: 34px 26px 42px; } }
+/* ========================================================
+   SISTEMA DE VERIFICACIÓN DOMICILIARIA - SAN MIGUEL
+   DISEÑO INSTITUCIONAL PANTALLA COMPLETA SPLIT VIEWPORT
+   ======================================================== */
+
+.login-viewport {
+  width: 100vw;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  overflow-x: hidden;
+  background: #f3f6f4;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-sizing: border-box;
+}
+
+/* ========================================================
+   PANEL IZQUIERDO INSTITUCIONAL (VERDE FOREST Y DORADO)
+   ======================================================== */
+.login-identity-side {
+  flex: 0 0 50%;
+  max-width: 50%;
+  min-height: 100vh;
+  position: relative;
+  background: #064e1a linear-gradient(155deg, #095f26 0%, #064e1a 50%, #043813 100%);
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* ONDAS CONCÉNTRICAS DECORATIVAS DEL DISEÑO */
+.login-identity-side::before {
+  content: '';
+  position: absolute;
+  top: -80px;
+  right: -80px;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  border: 1px solid rgba(242, 196, 0, 0.16);
+  box-shadow:
+    0 0 0 45px rgba(242, 196, 0, 0.05),
+    0 0 0 95px rgba(242, 196, 0, 0.03),
+    0 0 0 150px rgba(242, 196, 0, 0.015);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.login-identity-side::after {
+  content: '';
+  position: absolute;
+  bottom: -100px;
+  left: -80px;
+  width: 440px;
+  height: 440px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(242, 196, 0, 0.2);
+  box-shadow:
+    0 0 0 50px rgba(242, 196, 0, 0.07),
+    0 0 0 110px rgba(242, 196, 0, 0.035);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* CABECERA INSTITUCIONAL CON LOGO Y TEXTO */
+.brand-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 44px 44px 0;
+}
+
+.logo-ring {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3.5px solid #f2c400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+
+.logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.brand-titles {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-muni {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #f5fbf6;
+  text-transform: uppercase;
+}
+
+.brand-district {
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.brand-gold-bar {
+  width: 44px;
+  height: 2.5px;
+  background: #f2c400;
+  margin-top: 5px;
+  border-radius: 2px;
+}
+
+/* CONTENIDO CENTRAL DE IDENTIDAD */
+.identity-content {
+  position: relative;
+  z-index: 2;
+  padding: 24px 44px 10px;
+  margin: auto 0;
+}
+
+.identity-kicker {
+  color: #f2c400;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+}
+
+.identity-heading {
+  font-size: clamp(34px, 3.8vw, 48px);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -1.2px;
+  color: #ffffff;
+  margin: 0 0 14px;
+}
+
+.gold-highlight {
+  color: #f2c400;
+  display: inline-block;
+}
+
+.identity-desc {
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: #e1eee3;
+  margin: 0 0 24px;
+  max-width: 420px;
+}
+
+/* 3 BADGES / PILARES EN FILA */
+.feature-badges-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  max-width: 480px;
+}
+
+.feature-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 8px 12px;
+  border-radius: 12px;
+  backdrop-filter: blur(4px);
+  flex: 1;
+  min-width: 120px;
+}
+
+.badge-icon-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(7, 140, 42, 0.4);
+  border: 1.5px solid #20a846;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.badge-icon-circle svg {
+  width: 16px;
+  height: 16px;
+  stroke: #ffffff;
+}
+
+.badge-label {
+  font-size: 11px;
+  line-height: 1.25;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* ÁREA INFERIOR CON PAISAJE DE SAN MIGUEL */
+.identity-bottom-graphic {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin-top: auto;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.plaza-graphic-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+  max-height: 250px;
+}
+
+/* ========================================================
+   PANEL DERECHO: FORMULARIO FLOTANTE (ESTILO BLANCO MODERNO)
+   ======================================================== */
+.login-form-side {
+  flex: 0 0 50%;
+  max-width: 50%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+  background: #f3f6f4 radial-gradient(circle at 85% 20%, #eaf3ec 0%, #f4f7f5 55%, #ebf1ec 100%);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.login-floating-card {
+  width: min(440px, 100%);
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 42px 38px 34px;
+  box-shadow: 0 16px 40px rgba(6, 78, 26, 0.08), 0 2px 6px rgba(0, 0, 0, 0.03);
+  border: 1px solid #e7eee8;
+  box-sizing: border-box;
+}
+
+.card-header {
+  margin-bottom: 24px;
+}
+
+.portal-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.6px;
+  color: #078c2a;
+  text-transform: uppercase;
+  margin: 0 0 8px;
+}
+
+.portal-title {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: -0.6px;
+  color: #0e2617;
+  margin: 0 0 8px;
+}
+
+.portal-subtitle {
+  font-size: 13.5px;
+  color: #627566;
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* FORMULARIO */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e3524;
+}
+
+.input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1.5px solid #d4dfd6;
+  border-radius: 8px;
+  height: 46px;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.input-container:focus-within {
+  border-color: #076b25;
+  box-shadow: 0 0 0 3px rgba(7, 107, 37, 0.15);
+}
+
+.input-icon {
+  display: grid;
+  place-items: center;
+  padding-left: 14px;
+  color: #6b7e71;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.input-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.input-container input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 12px 14px 12px 10px;
+  font-size: 14px;
+  color: #17351e;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.input-container input::placeholder {
+  color: #9cb1a1;
+}
+
+.btn-toggle-eye {
+  background: none;
+  border: none;
+  padding: 0 14px;
+  display: grid;
+  place-items: center;
+  color: #68806f;
+  cursor: pointer;
+  transition: color 0.2s;
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.btn-toggle-eye:hover {
+  color: #076b25;
+}
+
+.btn-toggle-eye svg {
+  width: 19px;
+  height: 19px;
+}
+
+/* CHECKBOX */
+.remember-check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+.remember-check-label input {
+  accent-color: #076b25;
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* BOTÓN DE ACCIÓN */
+.btn-action-primary {
+  margin-top: 6px;
+  height: 48px;
+  border: none;
+  border-radius: 8px;
+  background: #076b25;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 4px 14px rgba(7, 107, 37, 0.25);
+  transition: all 0.2s;
+}
+
+.btn-action-primary:hover:not(:disabled) {
+  background: #05551c;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(7, 107, 37, 0.32);
+}
+
+.btn-action-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.arrow-svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* DIVISOR Y ESCUDO */
+.card-divider-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 28px 0 16px;
+}
+
+.divider-horizontal {
+  position: absolute;
+  width: 100%;
+  height: 1px;
+  background: #e3ede5;
+}
+
+.shield-center-circle {
+  position: relative;
+  z-index: 1;
+  background: #ffffff;
+  padding: 0 12px;
+  display: grid;
+  place-items: center;
+}
+
+.shield-center-circle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.card-footer {
+  text-align: center;
+}
+
+.card-footer p {
+  font-size: 11.5px;
+  color: #849688;
+  margin: 0;
+}
+
+/* ALERTAS */
+.alert {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.alert p {
+  margin: 0;
+}
+
+.alert-error {
+  background: #fef0ef;
+  color: #a82d24;
+  border: 1px solid #f9c7c4;
+}
+
+.alert-success {
+  background: #edf8ef;
+  color: #0b7235;
+  border: 1px solid #bce6c6;
+}
+
+/* ========================================================
+   RESPONSIVE DESIGN (TABLETS Y MÓVILES)
+   ======================================================== */
+@media (max-width: 960px) {
+  .login-viewport {
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  .login-identity-side {
+    flex: none;
+    max-width: 100%;
+    width: 100%;
+    min-height: auto;
+  }
+
+  .brand-header {
+    padding: 28px 24px 0;
+  }
+
+  .identity-content {
+    padding: 20px 24px 16px;
+  }
+
+  .plaza-graphic-img {
+    max-height: 180px;
+  }
+
+  .login-form-side {
+    flex: none;
+    max-width: 100%;
+    width: 100%;
+    padding: 32px 18px;
+  }
+
+  .login-floating-card {
+    padding: 32px 24px;
+    box-shadow: none;
+    border: 1px solid #dbe6dc;
+  }
+}

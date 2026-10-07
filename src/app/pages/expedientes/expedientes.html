@@ -1,6 +1,257 @@
 <main class="expedientes-page">
-  <header class="page-head"><div><p class="eyebrow">MUNICIPALIDAD DISTRITAL DE SAN MIGUEL · GESTIÓN OPERATIVA</p><h1>Fiscalizaciones</h1><p>Expedientes, administrados y visitas de fiscalización.</p></div><div class="head-actions"><a *ngIf="puedeRevisar" class="btn-light" routerLink="/revisiones">Pendientes de revisión</a><button type="button" class="btn-light" (click)="cargar()" [disabled]="cargando">Actualizar</button><a class="btn-primary" routerLink="/expedientes/nuevo">Nuevo expediente</a></div></header>
-  <section class="filters" aria-label="Filtros de expedientes"><label>Buscar<input [(ngModel)]="q" placeholder="Código, administrado, DNI, dirección…"></label><label>Origen<select [(ngModel)]="origen"><option value="">Todos</option><option value="SOLICITUD">Solicitud</option><option value="DENUNCIA">Denuncia</option><option value="INICIATIVA_MUNICIPAL">Iniciativa municipal</option><option value="ORDEN_SUPERIOR">Orden superior</option><option value="OPERATIVO_PROGRAMADO">Operativo programado</option><option value="OPERATIVO_INOPINADO">Operativo inopinado</option><option value="OTRO">Otro</option></select></label><label>Estado del expediente<select [(ngModel)]="estado"><option value="">Todos</option><option>ABIERTO</option><option>EN_FISCALIZACION</option><option>PENDIENTE_REVISION</option><option>CERRADO</option><option>CANCELADO</option></select></label><label>Estado de visita<select [(ngModel)]="estadoVisita"><option value="">Todos</option><option>PROGRAMADA</option><option>EN_CURSO</option><option>REALIZADA</option><option>NO_REALIZADA</option><option>VENCIDA</option><option>CANCELADA</option><option>REPROGRAMADA</option></select></label><label>Fiscalizador<select [(ngModel)]="fiscalizador"><option value="">Todos</option><option *ngFor="let f of opcionesFiscalizador()" [value]="f[0]">{{f[1]}}</option></select></label><label>Fecha de creación<input type="date" [(ngModel)]="fecha"></label></section>
-  <p class="error" *ngIf="error" role="alert">{{error}}</p><p class="loading" *ngIf="cargando">Cargando expedientes…</p>
-  <section class="case-list" *ngIf="!cargando"><a class="case-row" *ngFor="let e of filtrados" [routerLink]="['/expedientes',e.codigo]"><div class="case-main"><div class="case-code"><strong>{{e.codigo}}</strong><span class="pill" [class]="'pill '+e.estado.toLowerCase()">{{e.estado}}</span></div><h2>{{administrado(e)}} <small *ngIf="e.documentoAdministrado">· {{e.documentoAdministrado}}</small></h2><p>{{e.direccionFiscalizada||'Sin dirección'}} <span *ngIf="e.referenciaDomicilio">· {{e.referenciaDomicilio}}</span></p><p class="object">{{e.objetoFiscalizacion}}</p></div><div class="case-meta"><span class="origin">{{origenNombre(e.origen)}}</span><strong>Visita · {{vigente(e)?.estado||'Sin programación'}}</strong><span>{{vigente(e)?.fecha?(vigente(e)?.fecha|date:'dd/MM/yyyy'):'Sin fecha'}} {{vigente(e)?.hora||''}}</span><span>{{vigente(e)?.fiscalizadorNombre||'Sin fiscalizador'}}</span><small>Creado {{e.fechaCreacion|date:'dd/MM/yyyy'}}</small></div><span class="arrow" aria-hidden="true">›</span></a><p class="empty" *ngIf="!filtrados.length">No hay expedientes que coincidan con los filtros.</p></section>
+  <!-- CABECERA DE LA PÁGINA (HERO) -->
+  <header class="page-head">
+    <div class="head-titles">
+      <p class="eyebrow">MUNICIPALIDAD DISTRITAL DE SAN MIGUEL · GESTIÓN OPERATIVA</p>
+      <h1>Fiscalizaciones</h1>
+      <p class="head-desc">Expedientes, administrados y visitas de fiscalización.</p>
+    </div>
+    <div class="head-actions">
+      <a *ngIf="puedeRevisar" class="btn-action-light" routerLink="/revisiones">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="btn-icon">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        <span>Pendientes de revisión</span>
+      </a>
+
+      <button type="button" class="btn-action-light" (click)="cargar()" [disabled]="cargando">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="btn-icon">
+          <polyline points="23 4 23 10 17 10"/>
+          <polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        <span>Actualizar</span>
+      </button>
+
+      <a class="btn-action-primary" routerLink="/expedientes/nuevo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="btn-icon">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="16"/>
+          <line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+        <span>Nuevo expediente</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- BARRA DE FILTROS FLOTANTE -->
+  <section class="filters-card" aria-label="Filtros de expedientes">
+    <!-- BUSCAR -->
+    <div class="filter-col filter-col-search">
+      <label for="filter-q" class="filter-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="filter-svg">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        <span>Buscar</span>
+      </label>
+      <div class="search-input-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" class="search-inner-icon">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input id="filter-q" [(ngModel)]="q" placeholder="Código, administrado, DNI, dirección...">
+      </div>
+    </div>
+
+    <!-- ORIGEN -->
+    <div class="filter-col">
+      <label for="filter-origen" class="filter-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="filter-svg">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+          <polyline points="2 17 12 22 22 17"/>
+          <polyline points="2 12 12 17 22 12"/>
+        </svg>
+        <span>Origen</span>
+      </label>
+      <div class="select-wrap">
+        <select id="filter-origen" [(ngModel)]="origen">
+          <option value="">Todos</option>
+          <option value="SOLICITUD">Solicitud</option>
+          <option value="DENUNCIA">Denuncia</option>
+          <option value="INICIATIVA_MUNICIPAL">Iniciativa municipal</option>
+          <option value="ORDEN_SUPERIOR">Orden superior</option>
+          <option value="OPERATIVO_PROGRAMADO">Operativo programado</option>
+          <option value="OPERATIVO_INOPINADO">Operativo inopinado</option>
+          <option value="OTRO">Otro</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- ESTADO EXPEDIENTE -->
+    <div class="filter-col">
+      <label for="filter-estado" class="filter-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="filter-svg">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        <span>Estado del expediente</span>
+      </label>
+      <div class="select-wrap">
+        <select id="filter-estado" [(ngModel)]="estado">
+          <option value="">Todos</option>
+          <option>ABIERTO</option>
+          <option>EN_FISCALIZACION</option>
+          <option>PENDIENTE_REVISION</option>
+          <option>CERRADO</option>
+          <option>CANCELADO</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- ESTADO VISITA -->
+    <div class="filter-col">
+      <label for="filter-visita" class="filter-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="filter-svg">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        <span>Estado de visita</span>
+      </label>
+      <div class="select-wrap">
+        <select id="filter-visita" [(ngModel)]="estadoVisita">
+          <option value="">Todos</option>
+          <option>PROGRAMADA</option>
+          <option>EN_CURSO</option>
+          <option>REALIZADA</option>
+          <option>NO_REALIZADA</option>
+          <option>VENCIDA</option>
+          <option>CANCELADA</option>
+          <option>REPROGRAMADA</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- FISCALIZADOR -->
+    <div class="filter-col">
+      <label for="filter-fisc" class="filter-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="filter-svg">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span>Fiscalizador</span>
+      </label>
+      <div class="select-wrap">
+        <select id="filter-fisc" [(ngModel)]="fiscalizador">
+          <option value="">Todos</option>
+          <option *ngFor="let f of opcionesFiscalizador()" [value]="f[0]">{{ f[1] }}</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- FECHA CREACIÓN -->
+    <div class="filter-col">
+      <label for="filter-fecha" class="filter-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="filter-svg">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span>Fecha de creación</span>
+      </label>
+      <div class="date-input-wrap">
+        <input id="filter-fecha" type="date" [(ngModel)]="fecha">
+      </div>
+    </div>
+  </section>
+
+  <!-- MENSAJES DE ESTADO -->
+  <p class="error-msg" *ngIf="error" role="alert">{{ error }}</p>
+  <p class="loading-msg" *ngIf="cargando">Cargando expedientes...</p>
+
+  <!-- LISTA DE EXPEDIENTES (TARJETAS MODERNAS) -->
+  <section class="cases-container" *ngIf="!cargando">
+    <a class="case-card" *ngFor="let e of filtrados" [routerLink]="['/expedientes', e.codigo]">
+
+      <!-- ICONO IZQUIERDO -->
+      <div class="card-icon-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+      </div>
+
+      <!-- CONTENIDO PRINCIPAL (ADMINISTRADO Y PREDIO) -->
+      <div class="card-main-info">
+        <div class="card-code-row">
+          <strong class="code-title">{{ e.codigo }}</strong>
+          <span class="pill-badge" [class]="'pill-badge ' + e.estado.toLowerCase()">{{ e.estado }}</span>
+        </div>
+        <h2 class="admin-name">
+          {{ administrado(e) }}
+          <span class="admin-doc" *ngIf="e.documentoAdministrado">· {{ e.documentoAdministrado }}</span>
+        </h2>
+        <p class="address-line">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="detail-icon">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          <span>{{ e.direccionFiscalizada || 'Sin dirección' }} <small *ngIf="e.referenciaDomicilio">- {{ e.referenciaDomicilio }}</small></span>
+        </p>
+        <p class="object-line">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" class="detail-icon">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+            <line x1="7" y1="7" x2="7.01" y2="7"/>
+          </svg>
+          <span>Fiscalización asociada a solicitud {{ e.solicitudCodigo || e.objetoFiscalizacion }}</span>
+        </p>
+      </div>
+
+      <!-- INFORMACIÓN META DERECHA -->
+      <div class="card-meta-info">
+        <span class="origin-tag">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2" class="tag-icon">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          {{ origenNombre(e.origen) }}
+        </span>
+        <strong class="visit-status">Visita - {{ vigente(e)?.estado || 'Sin programación' }}</strong>
+        <div class="meta-row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.8" class="meta-icon">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <span>{{ vigente(e)?.fecha ? (vigente(e)?.fecha | date:'dd/MM/yyyy') : 'Sin fecha' }} {{ vigente(e)?.hora || '' }}</span>
+        </div>
+        <div class="meta-row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.8" class="meta-icon">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          <span>{{ vigente(e)?.fiscalizadorNombre || 'Sin fiscalizador' }}</span>
+        </div>
+        <div class="meta-row meta-date">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" class="meta-icon">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <small>Creado {{ e.fechaCreacion | date:'dd/MM/yyyy' }}</small>
+        </div>
+      </div>
+
+      <!-- BOTÓN FLECHA DERECHA CIRCULAR -->
+      <div class="card-action-circle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </div>
+
+    </a>
+
+    <!-- MENSAJE VACÍO -->
+    <div class="empty-state-box" *ngIf="!filtrados.length">
+      <p>No hay expedientes que coincidan con los filtros seleccionados.</p>
+    </div>
+  </section>
 </main>
