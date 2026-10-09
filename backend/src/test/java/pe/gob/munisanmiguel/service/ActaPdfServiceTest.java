@@ -15,4 +15,13 @@ class ActaPdfServiceTest {
         var pages=java.util.regex.Pattern.compile("/Count ([1-9][0-9]+)").matcher(pdf);
         assertTrue(pages.find());assertTrue(pdf.contains("Firma del fiscalizador: pendiente de firma manual"));
     }
+
+    @Test void registroPosteriorNoPresentaHoraProgramadaComoMedicionReal(){
+        var data=new java.util.HashMap<String,Object>();data.put("actaCodigo","ACT-2");data.put("expedienteCodigo","FIS-2");
+        data.put("registroPosterior",true);data.put("origenHoraEjecucion","PROGRAMADA");data.put("fechaInicio","2026-10-08T13:00");
+        data.put("registradoEn","2026-10-08T18:00");data.put("registradoPor","fiscalizador");
+        String pdf=new String(new ActaPdfService().generar(data),StandardCharsets.ISO_8859_1);
+        assertTrue(pdf.contains("Hora programada referencial"));assertFalse(pdf.contains("Hora de apertura"));
+        assertTrue(pdf.contains("Registrado posteriormente en"));
+    }
 }

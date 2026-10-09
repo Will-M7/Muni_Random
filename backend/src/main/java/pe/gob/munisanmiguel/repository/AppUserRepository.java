@@ -6,4 +6,5 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     Optional<AppUser> findByUsernameIgnoreCaseAndActivoTrue(String username);
     Optional<AppUser> findByUsernameIgnoreCase(String username);
     List<AppUser> findAllByOrderByUsernameAsc();
+    boolean existsByFiscalizadorId(String fiscalizadorId);
 }

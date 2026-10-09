@@ -12,6 +12,8 @@ import pe.gob.munisanmiguel.config.SecurityConfig;
 import pe.gob.munisanmiguel.repository.AppUserRepository;
 import pe.gob.munisanmiguel.security.JwtService;
 import pe.gob.munisanmiguel.service.ExpedienteFiscalizacionService;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -21,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ExpedienteAuthorizationTest {
     @Autowired MockMvc mvc;
     @MockitoBean ExpedienteFiscalizacionService service;
+    @MockitoBean pe.gob.munisanmiguel.repository.ProgramacionFiscalizacionRepository programaciones;
     @MockitoBean pe.gob.munisanmiguel.service.SolicitudService solicitudService;
     @MockitoBean JwtService jwt;
     @MockitoBean AppUserRepository users;
@@ -29,6 +32,15 @@ class ExpedienteAuthorizationTest {
     void municipioConsultaExpedientes(){
         org.junit.jupiter.api.Assertions.assertDoesNotThrow(()->mvc.perform(get("/api/expedientes")).andExpect(status().isOk()));
         verify(service).vencerProgramaciones();
+    }
+    @Test @WithMockUser(authorities="PROGRAMACION_VER")
+    void municipioConsultaAgendaDelDia() throws Exception {
+        mvc.perform(get("/api/programaciones/agenda").param("fecha","2026-10-08")).andExpect(status().isOk());
+        verify(programaciones).findAllByFechaOrderByHoraAscIdAsc(java.time.LocalDate.of(2026,10,8));
+    }
+    @Test @WithMockUser(authorities="TAREAS_PROPIAS_VER")
+    void fiscalizadorNoConsultaAgendaMunicipal() throws Exception {
+        mvc.perform(get("/api/programaciones/agenda").param("fecha","2026-10-08")).andExpect(status().isForbidden());
     }
     @Test @WithMockUser(authorities={"USUARIOS_VER","ROLES_VER","ROLES_GESTIONAR"})
     void adminTecnicoNoPuedeOperarExpedientes() throws Exception {
@@ -58,6 +70,19 @@ class ExpedienteAuthorizationTest {
     @Test
     void asignacionesSinAutenticacionRequierenLogin() throws Exception {
         mvc.perform(get("/api/fiscalizador/mis-expedientes")).andExpect(status().isUnauthorized());
+    }
+    @Test @WithMockUser(authorities="TAREAS_PROPIAS_VER")
+    void fiscalizadorDescargaSuJornadaHtml() throws Exception {
+        when(service.jornadaHtml("user",java.time.LocalDate.of(2026,10,8))).thenReturn(
+                new ExpedienteFiscalizacionService.HtmlJornadaDownload("<!doctype html><p>Sin visitas</p>".getBytes(java.nio.charset.StandardCharsets.UTF_8),"visitas-pendientes-2026-10-08.html"));
+        mvc.perform(get("/api/fiscalizador/mis-visitas.html").param("fecha","2026-10-08"))
+                .andExpect(status().isOk()).andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
+                .andExpect(header().string("Content-Disposition",org.hamcrest.Matchers.containsString("attachment")));
+        verify(service).jornadaHtml("user",java.time.LocalDate.of(2026,10,8));
+    }
+    @Test @WithMockUser(authorities="EXPEDIENTE_VER")
+    void usuarioSinTareasNoDescargaJornadaAjena() throws Exception {
+        mvc.perform(get("/api/fiscalizador/mis-visitas.html")).andExpect(status().isForbidden());
     }
     @Test @WithMockUser(authorities={"EXPEDIENTE_CREAR","PROGRAMACION_CREAR","FISCALIZADOR_ASIGNAR","PROGRAMACION_REPROGRAMAR","PROGRAMACION_CANCELAR"})
     void municipioPuedeInvocarCreacionYReprogramacion() throws Exception {

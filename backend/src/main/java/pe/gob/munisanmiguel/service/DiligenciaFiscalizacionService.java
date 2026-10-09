@@ -13,7 +13,9 @@ import pe.gob.munisanmiguel.exception.ConflictException;
 import pe.gob.munisanmiguel.exception.NotFoundException;
 import pe.gob.munisanmiguel.repository.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.*;
 
@@ -55,13 +57,14 @@ public class DiligenciaFiscalizacionService {
     public DiligenciaWorkspaceResponse iniciar(Long programacionId,InicioDiligenciaRequest r,String username){
         var p=programaciones.findByIdForUpdate(programacionId).orElseThrow(()->new NotFoundException("Programación no encontrada."));
         var user=usuario(username);validarPropiedad(p,user);
-        if(p.getEstadoProgramacion()==EstadoProgramacion.PROGRAMADA&&LocalDateTime.of(p.getFecha(),p.getHora()).isBefore(now())){
-            p.setEstadoProgramacion(EstadoProgramacion.VENCIDA);
-            evento(p.getExpediente(),p,"PROGRAMACION_VENCIDA","La programación venció antes de iniciar la diligencia.",map("estado","PROGRAMADA"),map("estado","VENCIDA"),username);
-            return workspace(p,null);
-        }
-        if(p.getEstadoProgramacion()!=EstadoProgramacion.PROGRAMADA)
-            throw new ConflictException("Solo se puede iniciar una programación vigente en estado PROGRAMADA.");
+        if(p.getEstadoProgramacion()==EstadoProgramacion.PROGRAMADA&&p.getFecha()!=null&&p.getFecha().isBefore(LocalDate.now(LIMA)))
+            throw new ConflictException("Terminó el día programado. Registra la visita posteriormente si se realizó.");
+        if(p.getFecha()==null||p.getFecha().isAfter(LocalDate.now(LIMA)))
+            throw new ConflictException("La visita solo puede iniciarse en su día programado.");
+        boolean vigenteHoy=p.getFecha()!=null&&p.getFecha().equals(LocalDate.now(LIMA));
+        if(p.getEstadoProgramacion()!=EstadoProgramacion.PROGRAMADA&&
+                !(p.getEstadoProgramacion()==EstadoProgramacion.VENCIDA&&vigenteHoy))
+            throw new ConflictException("Solo se puede iniciar una visita vigente durante su día programado.");
         if(diligencias.findByProgramacionId(programacionId).isPresent())
             throw new ConflictException("Esta programación ya tiene una diligencia iniciada.");
         var place=gps(r==null?null:r.estadoGps(),r==null?null:r.latitud(),r==null?null:r.longitud());
@@ -77,6 +80,44 @@ public class DiligenciaFiscalizacionService {
         responsible.setNombre(p.getFiscalizador().getNombre());responsible.setCargoCondicion(user.getCargo());responsible.setCreadoPor(user);responsible.setCreadoEn(now);
         participantes.save(responsible);
         evento(d,"PARTICIPANTE_AGREGADO","Fiscalizador responsable incorporado automáticamente",null,map("tipo","FISCALIZADOR_RESPONSABLE","nombre",p.getFiscalizador().getNombre()),username);
+        return workspace(p,d);
+    }
+
+    @Transactional
+    public DiligenciaWorkspaceResponse registrarPosterior(Long programacionId,RegistroPosteriorDiligenciaRequest r,String username){
+        var p=programaciones.findByIdForUpdate(programacionId).orElseThrow(()->new NotFoundException("Programación no encontrada."));
+        var user=usuario(username);validarPropiedad(p,user);
+        if(p.getEstadoProgramacion()!=EstadoProgramacion.PROGRAMADA&&p.getEstadoProgramacion()!=EstadoProgramacion.VENCIDA)
+            throw new ConflictException("Solo se puede registrar posteriormente una visita programada o vencida sin resultado.");
+        if(diligencias.findByProgramacionId(programacionId).isPresent())
+            throw new ConflictException("Esta programación ya tiene una diligencia registrada.");
+        if(p.getFecha()==null||p.getHora()==null)throw new ConflictException("La programación no tiene fecha y hora válidas.");
+        LocalDateTime programada=LocalDateTime.of(p.getFecha(),p.getHora());
+        LocalDateTime registro=now();
+        if(programada.isAfter(registro))throw new ConflictException("El registro posterior solo está disponible después de la hora programada.");
+        boolean declarada=r!=null&&r.horaEjecucion()!=null;
+        LocalDate fecha=declarada&&r.fechaEjecucion()!=null?r.fechaEjecucion():p.getFecha();
+        LocalTime hora=declarada?r.horaEjecucion():p.getHora();
+        LocalDateTime ejecucion=LocalDateTime.of(fecha,hora);
+        if(ejecucion.isAfter(registro))throw new ConflictException("La hora efectiva no puede estar en el futuro.");
+
+        var d=new DiligenciaFiscalizacion();d.setExpediente(p.getExpediente());d.setProgramacion(p);
+        d.setFiscalizadorResponsable(p.getFiscalizador());d.setFechaInicio(registro);
+        d.setGpsInicioEstado(EstadoGps.NO_DISPONIBLE);d.setGpsCierreEstado(EstadoGps.NO_DISPONIBLE);
+        d.setLugarDiligencia(p.getExpediente().getDireccionFiscalizada());d.setEstado(EstadoDiligencia.INICIADA);
+        d.setSituacionPersona(SituacionPersona.PENDIENTE);d.setMedioEntrega(MedioEntrega.PENDIENTE);
+        d.setCreatedAt(registro);d.setUpdatedAt(registro);d.setRegistroPosterior(true);d.setRegistradoEn(registro);
+        d.setRegistradoPor(user);d.setFechaHoraEjecucion(ejecucion);
+        d.setOrigenHoraEjecucion(declarada?OrigenHoraEjecucion.DECLARADA:OrigenHoraEjecucion.PROGRAMADA);
+        d=diligencias.saveAndFlush(d);p.setEstadoProgramacion(EstadoProgramacion.EN_CURSO);
+        if(p.getExpediente().getEstado()==EstadoExpediente.ABIERTO)p.getExpediente().setEstado(EstadoExpediente.EN_FISCALIZACION);
+        evento(d,"DILIGENCIA_REGISTRADA_POSTERIORMENTE","Diligencia abierta para registro posterior.",null,
+                map("estado","INICIADA","registradoEn",registro,"fechaHoraEjecucion",ejecucion,
+                        "origenHora",d.getOrigenHoraEjecucion().name()),username);
+        var responsible=new DiligenciaParticipante();responsible.setDiligencia(d);
+        responsible.setTipoParticipante(TipoParticipante.FISCALIZADOR_RESPONSABLE);
+        responsible.setNombre(p.getFiscalizador().getNombre());responsible.setCargoCondicion(user.getCargo());
+        responsible.setCreadoPor(user);responsible.setCreadoEn(registro);participantes.save(responsible);
         return workspace(p,d);
     }
 
@@ -227,19 +268,24 @@ public class DiligenciaFiscalizacionService {
         var es=d==null?List.<EvidenciaResponse>of():evidencias.findAllByDiligenciaIdOrderByFechaHoraAscIdAsc(d.getId()).stream().map(this::evidencia).toList();
         ActaResumenResponse brief=d==null||d.getActa()==null?null:new ActaResumenResponse(d.getActa().getId(),d.getActa().getCodigo(),d.getActa().getFirmaFiscalizadoEstado().name(),d.getActa().getPdfGeneradoNombre(),d.getActa().getPdfFirmadoNombre(),d.getActa().getGeneradoEn());
         return new DiligenciaWorkspaceResponse(d==null?null:d.getId(),e.getCodigo(),e.getOrigen().name(),e.getObjetoFiscalizacion(),e.getObservacionesIniciales(),
-                e.getNombreAdministrado()==null?"":e.getNombreAdministrado()+(e.getAdministradoApellidos()==null?"":" "+e.getAdministradoApellidos()),e.getDocumentoAdministrado(),e.getTelefonoContacto(),e.getDireccionFiscalizada(),e.getReferenciaDomicilio(),e.getLatitud(),e.getLongitud(),
+                e.getNombreAdministrado()==null?"":e.getNombreAdministrado()+(e.getAdministradoApellidos()==null?"":" "+e.getAdministradoApellidos()),
+                e.getNombreAdministrado(),e.getAdministradoApellidos(),p.getFiscalizador()==null?"Fiscalizador responsable":p.getFiscalizador().getNombre(),
+                e.getDocumentoAdministrado(),e.getTelefonoContacto(),e.getDireccionFiscalizada(),e.getReferenciaDomicilio(),e.getLatitud(),e.getLongitud(),
                 p.getId(),p.getFecha(),p.getHora(),p.getTipoVisita().name(),p.getEstadoProgramacion().name(),e.getEstado().name(),d==null?null:d.getEstado().name(),
                 d==null?null:d.getFechaInicio(),d==null?null:d.getFechaCierre(),d==null?null:d.getLatitudInicio(),d==null?null:d.getLongitudInicio(),d==null?null:d.getGpsInicioEstado().name(),
                 d==null?null:d.getLatitudCierre(),d==null?null:d.getLongitudCierre(),d==null?null:d.getGpsCierreEstado().name(),e.getDireccionFiscalizada(),
                 d==null?null:d.getSituacionPersona().name(),d==null?null:d.getPersonaNombres(),d==null?null:d.getPersonaApellidos(),d==null?null:d.getPersonaTipoDocumento(),d==null?null:d.getPersonaNumeroDocumento(),d==null?null:d.getPersonaCondicion(),d==null?null:d.getPersonaObservaciones(),
                 d==null?null:d.getHechosConstatados(),d==null?null:d.getOcurrencias(),d==null?null:d.getObservacionesFiscalizador(),d==null?null:d.getObservacionesFiscalizado(),d==null||d.getMotivoNoRealizada()==null?null:d.getMotivoNoRealizada().name(),d==null?null:d.getDetalleMotivoNoRealizada(),d!=null&&d.isCopiaEntregada(),d==null?null:d.getMedioEntrega().name(),
-                e.getDocumentoSustentoNombre(),ps,es,brief);
+                e.getDocumentoSustentoNombre(),d!=null&&d.isRegistroPosterior(),d==null?null:d.getRegistradoEn(),
+                d==null||d.getRegistradoPor()==null?null:d.getRegistradoPor().getUsername(),
+                d==null?null:d.getFechaHoraEjecucion(),d==null||d.getOrigenHoraEjecucion()==null?null:d.getOrigenHoraEjecucion().name(),ps,es,brief);
     }
     private ParticipanteResponse participante(DiligenciaParticipante p){return new ParticipanteResponse(p.getId(),p.getTipoParticipante().name(),p.getNombre(),p.getApellidos(),p.getTipoDocumento(),p.getNumeroDocumento(),p.getEntidadArea(),p.getCargoCondicion(),p.getObservaciones(),p.getCreadoEn(),p.getCreadoPor()==null?null:p.getCreadoPor().getUsername());}
     private EvidenciaResponse evidencia(EvidenciaFiscalizacion e){return new EvidenciaResponse(e.getId(),e.getTipo().name(),e.getNombreOriginal(),e.getTipoMime(),e.getTamanoBytes(),e.getDescripcion(),e.getFechaHora(),e.getCreadoPor()==null?null:e.getCreadoPor().getUsername());}
     private ActaResponse actaResponse(ActaFiscalizacion a){try{return actaResponse(a,json.readValue(a.getContenidoJson(),new TypeReference<Map<String,Object>>(){}));}catch(Exception e){throw new IllegalStateException("No se pudo leer el contenido persistido del acta.",e);}}
     private ActaResponse actaResponse(ActaFiscalizacion a,Map<String,Object> content){return new ActaResponse(a.getId(),a.getCodigo(),a.getDiligencia().getId(),a.getDiligencia().getExpediente().getCodigo(),a.getFirmaFiscalizadoEstado().name(),a.getFirmaFiscalizadoObservacion(),a.getPdfGeneradoNombre(),a.getPdfFirmadoNombre(),a.getGeneradoEn(),content);}
-    private Map<String,Object> snapshot(DiligenciaFiscalizacion d,String code,String signature,String signatureNote){var e=d.getExpediente();var map=new LinkedHashMap<String,Object>();map.put("actaCodigo",code);map.put("expedienteCodigo",e.getCodigo());map.put("origen",e.getOrigen().name());map.put("administrado",e.getNombreAdministrado()==null?"":e.getNombreAdministrado()+" "+(e.getAdministradoApellidos()==null?"":e.getAdministradoApellidos()));map.put("documentoAdministrado",e.getDocumentoAdministrado());map.put("lugar",d.getLugarDiligencia());map.put("fecha",d.getFechaInicio().toLocalDate().toString());map.put("fechaInicio",d.getFechaInicio().toString());map.put("fechaCierre",d.getFechaCierre().toString());map.put("tipoVisita",d.getProgramacion().getTipoVisita().name());map.put("objetoFiscalizacion",e.getObjetoFiscalizacion());map.put("observacionesPrevias",e.getObservacionesIniciales());map.put("fiscalizadorResponsable",d.getFiscalizadorResponsable().getNombre());map.put("situacionPersona",d.getSituacionPersona().name());map.put("personaNombres",d.getPersonaNombres());map.put("personaApellidos",d.getPersonaApellidos());map.put("personaTipoDocumento",d.getPersonaTipoDocumento());map.put("personaNumeroDocumento",d.getPersonaNumeroDocumento());map.put("personaCondicion",d.getPersonaCondicion());map.put("personaObservaciones",d.getPersonaObservaciones());map.put("hechosConstatados",d.getHechosConstatados());map.put("ocurrencias",d.getOcurrencias());map.put("observacionesFiscalizador",d.getObservacionesFiscalizador());map.put("observacionesFiscalizado",d.getObservacionesFiscalizado());map.put("firmaFiscalizadoEstado",signature);map.put("firmaFiscalizadoObservacion",signatureNote);map.put("copiaEntregada",d.isCopiaEntregada());map.put("medioEntrega",d.getMedioEntrega().name());map.put("gpsInicioEstado",d.getGpsInicioEstado().name());map.put("latitudInicio",d.getLatitudInicio());map.put("longitudInicio",d.getLongitudInicio());map.put("gpsCierreEstado",d.getGpsCierreEstado().name());map.put("latitudCierre",d.getLatitudCierre());map.put("longitudCierre",d.getLongitudCierre());
+    private Map<String,Object> snapshot(DiligenciaFiscalizacion d,String code,String signature,String signatureNote){var e=d.getExpediente();var map=new LinkedHashMap<String,Object>();map.put("actaCodigo",code);map.put("expedienteCodigo",e.getCodigo());map.put("origen",e.getOrigen().name());map.put("administrado",e.getNombreAdministrado()==null?"":e.getNombreAdministrado()+" "+(e.getAdministradoApellidos()==null?"":e.getAdministradoApellidos()));map.put("documentoAdministrado",e.getDocumentoAdministrado());map.put("lugar",d.getLugarDiligencia());map.put("fecha",d.getFechaInicio().toLocalDate().toString());map.put("fechaInicio",d.getFechaInicio().toString());map.put("fechaCierre",d.getFechaCierre().toString());map.put("registroPosterior",d.isRegistroPosterior());map.put("registradoEn",d.getRegistradoEn());map.put("registradoPor",d.getRegistradoPor()==null?null:d.getRegistradoPor().getUsername());map.put("fechaHoraEjecucion",d.getFechaHoraEjecucion());map.put("origenHoraEjecucion",d.getOrigenHoraEjecucion()==null?null:d.getOrigenHoraEjecucion().name());map.put("tipoVisita",d.getProgramacion().getTipoVisita().name());map.put("objetoFiscalizacion",e.getObjetoFiscalizacion());map.put("observacionesPrevias",e.getObservacionesIniciales());map.put("fiscalizadorResponsable",d.getFiscalizadorResponsable().getNombre());map.put("situacionPersona",d.getSituacionPersona().name());map.put("personaNombres",d.getPersonaNombres());map.put("personaApellidos",d.getPersonaApellidos());map.put("personaTipoDocumento",d.getPersonaTipoDocumento());map.put("personaNumeroDocumento",d.getPersonaNumeroDocumento());map.put("personaCondicion",d.getPersonaCondicion());map.put("personaObservaciones",d.getPersonaObservaciones());map.put("hechosConstatados",d.getHechosConstatados());map.put("ocurrencias",d.getOcurrencias());map.put("observacionesFiscalizador",d.getObservacionesFiscalizador());map.put("observacionesFiscalizado",d.getObservacionesFiscalizado());map.put("firmaFiscalizadoEstado",signature);map.put("firmaFiscalizadoObservacion",signatureNote);map.put("copiaEntregada",d.isCopiaEntregada());map.put("medioEntrega",d.getMedioEntrega().name());map.put("gpsInicioEstado",d.getGpsInicioEstado().name());map.put("latitudInicio",d.getLatitudInicio());map.put("longitudInicio",d.getLongitudInicio());map.put("gpsCierreEstado",d.getGpsCierreEstado().name());map.put("latitudCierre",d.getLatitudCierre());map.put("longitudCierre",d.getLongitudCierre());
+        if(d.isRegistroPosterior()&&d.getFechaHoraEjecucion()!=null){map.put("fecha",d.getFechaHoraEjecucion().toLocalDate().toString());map.put("fechaInicio",d.getFechaHoraEjecucion().toString());}
         map.put("participantes",participantes.findAllByDiligenciaIdOrderByCreadoEnAscIdAsc(d.getId()).stream().map(p->{var x=new LinkedHashMap<String,Object>();x.put("tipoParticipante",p.getTipoParticipante().name());x.put("nombre",p.getNombre());x.put("apellidos",p.getApellidos());x.put("tipoDocumento",p.getTipoDocumento());x.put("numeroDocumento",p.getNumeroDocumento());x.put("entidadArea",p.getEntidadArea());x.put("cargoCondicion",p.getCargoCondicion());return x;}).toList());
         map.put("evidencias",evidencias.findAllByDiligenciaIdOrderByFechaHoraAscIdAsc(d.getId()).stream().map(v->{var x=new LinkedHashMap<String,Object>();x.put("tipo",v.getTipo().name());x.put("nombreOriginal",v.getNombreOriginal());x.put("tipoMime",v.getTipoMime());x.put("descripcion",v.getDescripcion());return x;}).toList());return map;}
     private void evento(DiligenciaFiscalizacion d,String type,String description,Map<String,?> before,Map<String,?> after,String username){var h=new ExpedienteHistorial();h.setExpediente(d.getExpediente());h.setProgramacion(d.getProgramacion());h.setFechaHora(now());h.setActorUsername(username);h.setActor(usuarios.findByUsernameIgnoreCaseAndActivoTrue(username).orElse(null));h.setTipoEvento(type);h.setDescripcion(description);h.setValoresAnteriores(serialize(before));h.setValoresNuevos(serialize(after));historial.save(h);}

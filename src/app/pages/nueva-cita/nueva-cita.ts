@@ -14,6 +14,7 @@ import { Subject, EMPTY, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, filter, switchMap, takeUntil, tap } from 'rxjs/operators';
 import { ProgramacionDia } from '../../services/verificacion.service';
 import { Fiscalizador } from '../../models/solicitud.model';
+import { formatTimeDual, validTime24 } from '../../core/time';
 
 @Component({
   selector: 'app-nueva-cita',
@@ -214,6 +215,7 @@ export class NuevaCitaComponent implements OnInit, OnDestroy {
 
   onFechaFiscalizacionChange(fecha: string): void { this.datos.fechaFiscalizacion = fecha || ''; this.fechaFiscalizacion$.next(this.datos.fechaFiscalizacion); }
   onHoraFiscalizacionChange(hora: string): void { this.datos.horaFiscalizacion = hora || ''; this.actualizarConflictoHorario(); }
+  horaDual(hora:string):string{return formatTimeDual(hora);}
   private actualizarConflictoHorario(): void { const hora = (this.datos.horaFiscalizacion || '').slice(0, 5); const fiscalizador=this.datos.fiscalizadorId; this.horarioOcupado = !!hora && !!fiscalizador && this.agendaDelDia.some(item => item.horaFiscalizacion.slice(0, 5) === hora && item.fiscalizador === this.fiscalizadores.find(f=>f.id===fiscalizador)?.nombre && item.codigo !== this.codigoEdicion); }
 
   // Documento PDF
@@ -327,7 +329,7 @@ export class NuevaCitaComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(this.datos.fechaFiscalizacion) || !this.datos.fechaFiscalizacion || !/^\d{2}:\d{2}$/.test(this.datos.horaFiscalizacion)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(this.datos.fechaFiscalizacion) || !this.datos.fechaFiscalizacion || !validTime24(this.datos.horaFiscalizacion)) {
       this.mensajeError = 'Debe indicar una fecha y hora válidas para la fiscalización.';
       return;
     }

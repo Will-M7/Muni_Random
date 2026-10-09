@@ -24,6 +24,13 @@ public class FiscalizadorController {
     @GetMapping("/mis-tareas") @PreAuthorize("hasAuthority('TAREAS_PROPIAS_VER')") public List<FiscalizadorTaskResponse> tareas(@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate fecha, Authentication auth) { service.expirarPendientes(); return service.misTareas(auth, fecha); }
     @GetMapping("/mis-tareas/proximas") @PreAuthorize("hasAuthority('TAREAS_PROPIAS_VER')") public List<FiscalizadorTaskResponse> proximas(Authentication auth) { service.expirarPendientes(); return service.misProximas(auth); }
     @GetMapping("/mis-expedientes") @PreAuthorize("hasAuthority('TAREAS_PROPIAS_VER')") public List<FiscalizadorExpedienteTaskResponse> misExpedientes(Authentication auth) { service.expirarPendientes(); return expedientes.misTareasCampo(auth.getName()); }
+    @GetMapping(value="/mis-visitas.html",produces=MediaType.TEXT_HTML_VALUE) @PreAuthorize("hasAuthority('TAREAS_PROPIAS_VER')")
+    public ResponseEntity<byte[]> jornada(@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate fecha,Authentication auth){
+        var d=expedientes.jornadaHtml(auth.getName(),fecha);
+        return ResponseEntity.ok().contentType(new MediaType("text","html",StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(d.filename(),StandardCharsets.UTF_8).build().toString())
+                .body(d.content());
+    }
     @GetMapping("/mis-tareas/historial") @PreAuthorize("hasAuthority('TAREAS_PROPIAS_VER')") public List<FiscalizadorTaskResponse> historial(@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate fecha, @RequestParam(required=false) ResultadoFiscalizacion resultado, Authentication auth) { service.expirarPendientes(); return service.miHistorial(auth, fecha, resultado); }
     @GetMapping("/ruta") @PreAuthorize("hasAuthority('RUTA_VER')") public List<FiscalizadorTaskResponse> ruta(@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate fecha, Authentication auth) { service.expirarPendientes(); return service.misTareas(auth, fecha); }
     @GetMapping("/mis-tareas/{codigo}") @PreAuthorize("hasAuthority('TAREAS_PROPIAS_VER')") public SolicitudResponse detalle(@PathVariable String codigo, Authentication auth) { service.expirarPendientes(); return service.mapperResponse(service.tareaPropia(codigo, auth)); }

@@ -25,6 +25,13 @@ public class DiligenciaFiscalizacionController {
     @PreAuthorize("hasAuthority('DILIGENCIA_INICIAR')")
     public DiligenciaWorkspaceResponse iniciar(@PathVariable Long programacionId,@RequestBody(required=false) InicioDiligenciaRequest request,Authentication auth){return service.iniciar(programacionId,request,auth.getName());}
 
+    @PostMapping("/programaciones/{programacionId}/diligencia/registrar-posterior")
+    @PreAuthorize("hasAuthority('DILIGENCIA_INICIAR')")
+    public DiligenciaWorkspaceResponse registrarPosterior(@PathVariable Long programacionId,
+            @Valid @RequestBody RegistroPosteriorDiligenciaRequest request,Authentication auth){
+        return service.registrarPosterior(programacionId,request,auth.getName());
+    }
+
     @PostMapping("/programaciones/{programacionId}/diligencia/no-realizada")
     @PreAuthorize("hasAuthority('DILIGENCIA_FINALIZAR')")
     public DiligenciaWorkspaceResponse noRealizada(@PathVariable Long programacionId,@Valid @RequestBody NoRealizadaRequest request,Authentication auth){return service.noRealizada(programacionId,request,auth.getName());}

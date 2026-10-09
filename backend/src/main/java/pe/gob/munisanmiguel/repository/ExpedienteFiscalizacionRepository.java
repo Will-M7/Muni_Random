@@ -12,4 +12,5 @@ public interface ExpedienteFiscalizacionRepository extends JpaRepository<Expedie
     @EntityGraph(attributePaths={"solicitud","creadoPor","programaciones","programaciones.fiscalizador"})
     Optional<ExpedienteFiscalizacion> findByCodigo(String codigo);
     Optional<ExpedienteFiscalizacion> findBySolicitudId(Long solicitudId);
+    boolean existsByDependenciaProcedenciaIgnoreCaseAndReferenciaSolicitudIgnoreCase(String dependencia,String referencia);
 }

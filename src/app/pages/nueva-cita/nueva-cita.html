@@ -230,14 +230,14 @@
           <p class="section-desc">Define la fecha y hora previstas para la visita de fiscalización.</p>
           <div class="form-grid">
             <div class="form-group col-6"><label for="fechaFiscalizacion">Fecha de fiscalización <span class="req">*</span></label><input id="fechaFiscalizacion" type="date" [ngModel]="datos.fechaFiscalizacion" (ngModelChange)="onFechaFiscalizacionChange($event)" name="fechaFiscalizacion" required /></div>
-            <div class="form-group col-6"><label for="horaFiscalizacion">Hora de fiscalización <span class="req">*</span></label><input id="horaFiscalizacion" type="time" [ngModel]="datos.horaFiscalizacion" (ngModelChange)="onHoraFiscalizacionChange($event)" name="horaFiscalizacion" required /><small class="schedule-conflict" *ngIf="horarioOcupado">Ya existe una fiscalización programada a esta hora.</small></div>
-            <div class="form-group col-12"><label for="fiscalizadorId">Fiscalizador asignado <span class="req">*</span></label><select id="fiscalizadorId" [(ngModel)]="datos.fiscalizadorId" (ngModelChange)="onHoraFiscalizacionChange(datos.horaFiscalizacion)" name="fiscalizadorId" required><option value="">Seleccionar fiscalizador</option><option *ngFor="let f of fiscalizadores" [value]="f.id">{{ f.nombre }} · {{ f.zona }}</option></select></div>
+            <div class="form-group col-6"><label for="horaFiscalizacion">Hora de fiscalización (24 h) <span class="req">*</span></label><input id="horaFiscalizacion" type="time" min="00:00" max="23:59" step="60" [ngModel]="datos.horaFiscalizacion" (ngModelChange)="onHoraFiscalizacionChange($event)" name="horaFiscalizacion" required /><small>{{horaDual(datos.horaFiscalizacion)}}</small><small class="schedule-conflict" *ngIf="horarioOcupado">Ya existe una fiscalización programada a esta hora.</small></div>
+            <div class="form-group col-12"><label for="fiscalizadorId">Fiscalizador asignado <span class="req">*</span></label><select id="fiscalizadorId" [(ngModel)]="datos.fiscalizadorId" (ngModelChange)="onHoraFiscalizacionChange(datos.horaFiscalizacion)" name="fiscalizadorId" required><option value="">Seleccionar fiscalizador</option><option *ngFor="let f of fiscalizadores" [value]="f.id">{{ f.nombre }}</option></select></div>
           </div>
           <div class="day-schedule" *ngIf="datos.fechaFiscalizacion">
             <div class="day-schedule-head"><div><h3>Programación del día</h3><p>{{ datos.fechaFiscalizacion | date:'dd/MM/yyyy' }}</p></div><strong>{{ cargandoAgenda ? 'Cargando...' : agendaDelDia.length + ' fiscalizaciones programadas' }}</strong></div>
             <p class="schedule-error" *ngIf="agendaError">{{ agendaError }}</p>
             <p class="schedule-empty" *ngIf="!cargandoAgenda && !agendaError && !agendaDelDia.length">No hay fiscalizaciones programadas para esta fecha.</p>
-            <ul class="day-schedule-list" *ngIf="agendaDelDia.length"><li *ngFor="let item of agendaDelDia"><time>{{ item.horaFiscalizacion | slice:0:5 }}</time><span><strong>{{ item.codigo }}</strong> {{ item.ciudadano }}</span><small>{{ item.fiscalizador }} · {{ item.estado }}</small></li></ul>
+            <ul class="day-schedule-list" *ngIf="agendaDelDia.length"><li *ngFor="let item of agendaDelDia"><time>{{ horaDual(item.horaFiscalizacion) }}</time><span><strong>{{ item.codigo }}</strong> {{ item.ciudadano }}</span><small>{{ item.fiscalizador }} · {{ item.estado }}</small></li></ul>
           </div>
         </div>
       </section>

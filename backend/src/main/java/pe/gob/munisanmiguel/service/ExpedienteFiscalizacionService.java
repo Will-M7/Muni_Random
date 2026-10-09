@@ -11,6 +11,9 @@ import pe.gob.munisanmiguel.exception.ConflictException;
 import pe.gob.munisanmiguel.exception.NotFoundException;
 import pe.gob.munisanmiguel.repository.*;
 import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 @Service
@@ -170,13 +173,87 @@ public class ExpedienteFiscalizacionService {
                 }).toList();
     }
 
+    @Transactional(readOnly=true)
+    public HtmlJornadaDownload jornadaHtml(String username,LocalDate requestedDate){
+        var user=usuario(username);
+        if(user.getFiscalizador()==null)throw new NotFoundException("El usuario no tiene fiscalizador asociado.");
+        LocalDate date=requestedDate==null?LocalDate.now(LIMA):requestedDate;
+        var visits=programaciones.findAllByFiscalizadorIdAndEstadoProgramacionInOrderByFechaAscHoraAsc(
+                user.getFiscalizador().getId(),List.of(EstadoProgramacion.PROGRAMADA,EstadoProgramacion.VENCIDA,EstadoProgramacion.EN_CURSO))
+                .stream().filter(p->date.equals(p.getFecha())).sorted(Comparator.comparing(ProgramacionFiscalizacion::getHora)).toList();
+        StringBuilder rows=new StringBuilder();
+        for(var p:visits){
+            var e=p.getExpediente();String address=Objects.toString(e.getDireccionFiscalizada(),"").trim();
+            boolean coordinates=validCoordinates(e.getLatitud(),e.getLongitud());
+            String maps=coordinates?"https://www.google.com/maps/search/?api=1&query="+e.getLatitud()+","+e.getLongitud()
+                    :address.isBlank()?null:"https://www.google.com/maps/search/?api=1&query="+URLEncoder.encode(address,StandardCharsets.UTF_8);
+            String location=coordinates?escape(e.getLatitud()+", "+e.getLongitud()):address.isBlank()?"<strong>Sin ubicación suficiente</strong>":"Sin coordenadas; se usará la dirección";
+            rows.append("<tr data-id=\"").append(p.getId()).append("\" data-lat=\"")
+                    .append(coordinates?e.getLatitud():"").append("\" data-lon=\"")
+                    .append(coordinates?e.getLongitud():"").append("\"><td>")
+                    .append(escape(p.getFecha().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))).append("</td><td>")
+                    .append(escape(p.getHora().format(DateTimeFormatter.ofPattern("HH:mm"))))
+                    .append("<br><small>").append(escape(horaDoce(p.getHora()))).append("</small></td><td><strong>")
+                    .append(escape(e.getCodigo())).append("</strong></td><td>").append(escape(e.getObjetoFiscalizacion()))
+                    .append("</td><td>").append(escape(address.isBlank()?"Sin dirección":address)).append("</td><td>")
+                    .append(escape(Objects.toString(e.getReferenciaDomicilio(),"Sin referencia"))).append("</td><td>")
+                    .append(location).append(maps==null?"":"<br><a href=\""+escape(maps)+"\">Abrir Google Maps</a>")
+                    .append("</td><td>").append(escape(p.getEstadoProgramacion().name()))
+                    .append("</td><td><button type=\"button\" data-toggle>Marcar atendida (solo esta guía)</button><br><label>Hora declarada (opcional) <input type=\"time\" data-hour></label><small data-local-state></small></td></tr>");
+        }
+        if(visits.isEmpty())rows.append("<tr><td colspan=\"9\">No hay visitas pendientes asignadas para esta fecha.</td></tr>");
+        String guideScript=visits.isEmpty()?"":"""
+                <script>
+                (()=>{
+                  const rows=[...document.querySelectorAll('tr[data-id]')],svg=document.getElementById('local-map');
+                  const ns='http://www.w3.org/2000/svg',route=document.getElementById('route-link'),count=document.getElementById('pending-count');
+                  function point(row){const lat=Number(row.dataset.lat),lon=Number(row.dataset.lon);return row.dataset.lat!==''&&row.dataset.lon!==''&&Number.isFinite(lat)&&Number.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180?{row,lat,lon}:null;}
+                  function render(){const active=rows.filter(row=>row.dataset.attended!=='yes'),points=active.map(point).filter(Boolean);
+                    count.textContent=String(active.length);svg.replaceChildren();
+                    if(points.length){const lats=points.map(p=>p.lat),lons=points.map(p=>p.lon),minLat=Math.min(...lats),maxLat=Math.max(...lats),minLon=Math.min(...lons),maxLon=Math.max(...lons);
+                      points.forEach((p,i)=>{const x=40+(p.lon-minLon)/(maxLon-minLon||1)*560,y=280-(p.lat-minLat)/(maxLat-minLat||1)*240;
+                        const group=document.createElementNS(ns,'g'),circle=document.createElementNS(ns,'circle'),label=document.createElementNS(ns,'text'),title=document.createElementNS(ns,'title');
+                        circle.setAttribute('cx',x);circle.setAttribute('cy',y);circle.setAttribute('r','13');circle.setAttribute('fill','#166a53');
+                        label.setAttribute('x',x);label.setAttribute('y',y+5);label.setAttribute('text-anchor','middle');label.setAttribute('fill','white');label.textContent=String(i+1);
+                        title.textContent=p.row.cells[2].textContent+' · '+p.row.cells[4].textContent;group.append(circle,label,title);svg.append(group);});}
+                    const stops=points.map(p=>p.lat+','+p.lon);if(stops.length){const u=new URL(stops.length===1?'https://www.google.com/maps/search/':'https://www.google.com/maps/dir/');u.searchParams.set('api','1');
+                      if(stops.length===1)u.searchParams.set('query',stops[0]);else{u.searchParams.set('origin',stops[0]);u.searchParams.set('destination',stops.at(-1));if(stops.length>2)u.searchParams.set('waypoints',stops.slice(1,-1).join('|'));}
+                      route.href=u.href;route.hidden=false;}else route.hidden=true;
+                    document.getElementById('map-note').textContent=points.length?'Vista local esquemática de '+points.length+' punto(s); no sustituye a un mapa cartográfico.':'No quedan puntos pendientes con coordenadas.';
+                  }
+                  rows.forEach(row=>{const button=row.querySelector('[data-toggle]'),state=row.querySelector('[data-local-state]'),hour=row.querySelector('[data-hour]');
+                    button.addEventListener('click',()=>{const attended=row.dataset.attended!=='yes';row.dataset.attended=attended?'yes':'no';button.textContent=attended?'Desmarcar atención local':'Marcar atendida (solo esta guía)';state.textContent=attended?'Atendida en esta guía'+(hour.value?' a las '+hour.value:''):'';render();});
+                    hour.addEventListener('change',()=>{if(row.dataset.attended==='yes')state.textContent='Atendida en esta guía'+(hour.value?' a las '+hour.value:'');});});render();
+                })();
+                </script>
+                """;
+        String html="""
+                <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+                <title>Mis visitas pendientes</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#17211d}table{border-collapse:collapse;width:100%%}th,td{border:1px solid #bbb;padding:8px;text-align:left;vertical-align:top}th{background:#eee}small{color:#555}svg{border:1px solid #bbb;max-width:100%%;height:auto}button,input{font:inherit}small{display:block}[data-attended=yes]{opacity:.6}@media print{a{color:#000}}</style></head>
+                <body><h1>Mis visitas pendientes</h1><p><strong>Fiscalizador:</strong> %s</p><p><strong>Fecha:</strong> %s</p>
+                <p>Guía de consulta generada el %s (America/Lima). Marcar una visita aquí no registra diligencias, actas ni cambios en el sistema. Las marcas y horas son solo locales durante esta sesión; un archivo file:// no garantiza conservarlas.</p>
+                <p>Pendientes en esta guía: <strong id="pending-count">%s</strong> · <a id="route-link" href="https://www.google.com/maps" target="_blank" rel="noopener" hidden>Abrir recorrido pendiente en Google Maps</a></p>
+                <svg id="local-map" viewBox="0 0 640 320" role="img" aria-label="Representación esquemática local de puntos pendientes"></svg><p id="map-note">Vista local sin mapas externos.</p>
+                <table><thead><tr><th>Fecha</th><th>Hora programada</th><th>Expediente</th><th>Objeto</th><th>Dirección</th><th>Referencia</th><th>Ubicación</th><th>Estado</th><th>Control local</th></tr></thead><tbody>%s</tbody></table>%s</body></html>
+                """.formatted(escape(user.getDisplayName()),date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                        nowLima().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")),visits.size(),rows,guideScript);
+        return new HtmlJornadaDownload(html.getBytes(StandardCharsets.UTF_8),"visitas-pendientes-"+date+".html");
+    }
+
     @Transactional
     public void vencerProgramaciones() {
-        LocalDateTime now=LocalDateTime.now(LIMA);
+        LocalDate today=LocalDate.now(LIMA);
         var vencidas=programaciones.findAllByOrderByFechaAscHoraAsc().stream()
-                .filter(p->p.getEstadoProgramacion()==EstadoProgramacion.PROGRAMADA&&p.getFecha()!=null&&p.getHora()!=null&&LocalDateTime.of(p.getFecha(),p.getHora()).isBefore(now)).toList();
-        for(var p:vencidas){p.setEstadoProgramacion(EstadoProgramacion.VENCIDA);evento(p.getExpediente(),p,"PROGRAMACION_VENCIDA","Venció la fecha y hora de visita sin resultado",map("estado","PROGRAMADA"),map("estado","VENCIDA"),"SISTEMA");}
+                .filter(p->p.getEstadoProgramacion()==EstadoProgramacion.PROGRAMADA&&p.getFecha()!=null&&p.getFecha().isBefore(today)
+                        &&diligencias.findByProgramacionId(p.getId()).isEmpty()).toList();
+        for(var p:vencidas){p.setEstadoProgramacion(EstadoProgramacion.VENCIDA);evento(p.getExpediente(),p,"PROGRAMACION_VENCIDA","Terminó el día programado sin resultado",map("estado","PROGRAMADA"),map("estado","VENCIDA"),"SISTEMA");}
     }
+
+    private boolean validCoordinates(java.math.BigDecimal lat,java.math.BigDecimal lon){return lat!=null&&lon!=null&&lat.compareTo(java.math.BigDecimal.valueOf(-90))>=0&&lat.compareTo(java.math.BigDecimal.valueOf(90))<=0&&lon.compareTo(java.math.BigDecimal.valueOf(-180))>=0&&lon.compareTo(java.math.BigDecimal.valueOf(180))<=0;}
+    private String escape(Object value){return Objects.toString(value,"").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;").replace("'","&#39;");}
+    private String horaDoce(LocalTime time){int h=time.getHour();return (h%12==0?12:h%12)+":"+String.format("%02d",time.getMinute())+(h<12?" a. m.":" p. m.");}
+    private LocalDateTime nowLima(){return LocalDateTime.now(LIMA);}
+    public record HtmlJornadaDownload(byte[] content,String filename){}
 
     @Transactional
     public void sincronizarSolicitud(Solicitud s,String username){
@@ -237,7 +314,7 @@ public class ExpedienteFiscalizacionService {
         if(s.getResultadoFiscalizacion()==ResultadoFiscalizacion.REALIZADA)return EstadoProgramacion.REALIZADA;
         if(s.getResultadoFiscalizacion()==ResultadoFiscalizacion.NO_REALIZADA)return EstadoProgramacion.NO_REALIZADA;
         if(s.getEstado()==EstadoSolicitud.EXPIRADO)return EstadoProgramacion.VENCIDA;
-        if(s.getFechaFiscalizacion()!=null&&s.getHoraFiscalizacion()!=null&&LocalDateTime.of(s.getFechaFiscalizacion(),s.getHoraFiscalizacion()).isBefore(LocalDateTime.now(LIMA)))return EstadoProgramacion.VENCIDA;
+        if(s.getFechaFiscalizacion()!=null&&s.getFechaFiscalizacion().isBefore(LocalDate.now(LIMA)))return EstadoProgramacion.VENCIDA;
         return EstadoProgramacion.PROGRAMADA;
     }
     private ProgramacionFiscalizacion crearProgramacionLegacy(ExpedienteFiscalizacion e,Solicitud s,String username,EstadoProgramacion estado){
@@ -255,12 +332,14 @@ public class ExpedienteFiscalizacionService {
         if(f!=null&&programaciones.existsByFiscalizadorIdAndFechaAndHoraAndEstadoProgramacionIn(f.getId(),fecha,hora,List.of(EstadoProgramacion.PROGRAMADA,EstadoProgramacion.EN_CURSO)))
             throw new ConflictException("El fiscalizador ya tiene una visita programada para esa fecha y hora.");
     }
-    private void validarFechaFutura(LocalDate fecha,LocalTime hora){if(fecha==null||hora==null||!LocalDateTime.of(fecha,hora).isAfter(LocalDateTime.now(LIMA)))throw new ConflictException("La fecha y hora de visita deben ser futuras.");}
+    private void validarFechaFutura(LocalDate fecha,LocalTime hora){if(fecha==null||hora==null||fecha.isBefore(LocalDate.now(LIMA)))throw new ConflictException("La visita debe programarse para hoy o una fecha futura.");}
     private void validarDatosAdministrado(ExpedienteRequest r){
+        if(blank(r.direccionFiscalizada())==null)throw new ConflictException("La dirección fiscalizada es obligatoria.");
+        if((r.latitud()==null)!=(r.longitud()==null))throw new ConflictException("Indique ambas coordenadas o ninguna.");
+        if(r.latitud()!=null&&(r.latitud().compareTo(java.math.BigDecimal.valueOf(-90))<0||r.latitud().compareTo(java.math.BigDecimal.valueOf(90))>0||r.longitud().compareTo(java.math.BigDecimal.valueOf(-180))<0||r.longitud().compareTo(java.math.BigDecimal.valueOf(180))>0))throw new ConflictException("Las coordenadas están fuera de rango.");
+        if(blank(r.documentoAdministrado())==null&&blank(r.nombreAdministrado())==null&&blank(r.administradoApellidos())==null)return;
         if(r.documentoAdministrado()==null||!r.documentoAdministrado().matches("\\d{8}"))throw new ConflictException("El DNI debe contener ocho dígitos.");
         if(blank(r.nombreAdministrado())==null||blank(r.administradoApellidos())==null)throw new ConflictException("Complete nombres y apellidos del administrado.");
-        if(blank(r.direccionFiscalizada())==null)throw new ConflictException("La dirección fiscalizada es obligatoria.");
-        if(r.latitud()==null||r.longitud()==null||r.latitud().compareTo(java.math.BigDecimal.valueOf(-90))<0||r.latitud().compareTo(java.math.BigDecimal.valueOf(90))>0||r.longitud().compareTo(java.math.BigDecimal.valueOf(-180))<0||r.longitud().compareTo(java.math.BigDecimal.valueOf(180))>0)throw new ConflictException("Confirme una ubicación válida en el mapa.");
     }
     private Fiscalizador fiscalizador(String id){return id==null||id.isBlank()?null:fiscalizadores.findById(id).orElseThrow(()->new NotFoundException("Fiscalizador no encontrado."));}
     private AppUser usuario(String username){return users.findByUsernameIgnoreCaseAndActivoTrue(username).orElseThrow(()->new NotFoundException("Usuario autenticado no encontrado."));}
@@ -275,7 +354,7 @@ public class ExpedienteFiscalizacionService {
     private ExpedienteResponse response(ExpedienteFiscalizacion e){
         var ps=programaciones.findAllByExpedienteIdOrderByIdAsc(e.getId()).stream().map(this::response).toList();
         var hs=historial.findAllByExpedienteIdOrderByFechaHoraAscIdAsc(e.getId()).stream().map(h->new ExpedienteHistorialResponse(h.getFechaHora(),h.getActorUsername(),h.getTipoEvento(),h.getDescripcion(),h.getValoresAnteriores(),h.getValoresNuevos(),h.getProgramacion()==null?null:h.getProgramacion().getId())).toList();
-        return new ExpedienteResponse(e.getId(),e.getCodigo(),e.getFechaCreacion(),e.getCreadoPor()==null?null:e.getCreadoPor().getUsername(),e.getOrigen().name(),e.getDetalleOrigen(),e.getEstado().name(),e.getObjetoFiscalizacion(),e.getObservacionesIniciales(),e.getSolicitud()==null?null:e.getSolicitud().getCodigo(),e.getTipoAdministrado(),e.getDocumentoAdministrado(),e.getNombreAdministrado(),e.getTelefonoContacto(),e.getDireccionFiscalizada(),e.getAdministradoApellidos(),e.getReferenciaDomicilio(),e.getLatitud(),e.getLongitud(),e.getDocumentoSustentoNombre(),e.getDocumentoSustentoFecha(),e.getSolicitud()==null?null:e.getSolicitud().getReporteNombreOriginal(),ps,hs);
+        return new ExpedienteResponse(e.getId(),e.getCodigo(),e.getFechaCreacion(),e.getCreadoPor()==null?null:e.getCreadoPor().getUsername(),e.getOrigen().name(),e.getDetalleOrigen(),e.getDependenciaProcedencia(),e.getReferenciaSolicitud(),e.getEstado().name(),e.getObjetoFiscalizacion(),e.getObservacionesIniciales(),e.getSolicitud()==null?null:e.getSolicitud().getCodigo(),e.getTipoAdministrado(),e.getDocumentoAdministrado(),e.getNombreAdministrado(),e.getTelefonoContacto(),e.getDireccionFiscalizada(),e.getAdministradoApellidos(),e.getReferenciaDomicilio(),e.getLatitud(),e.getLongitud(),e.getDocumentoSustentoNombre(),e.getDocumentoSustentoFecha(),e.getSolicitud()==null?null:e.getSolicitud().getReporteNombreOriginal(),ps,hs);
     }
     private ProgramacionFiscalizacionResponse response(ProgramacionFiscalizacion p){return new ProgramacionFiscalizacionResponse(p.getId(),p.getFecha(),p.getHora(),p.getTipoVisita().name(),p.getEstadoProgramacion().name(),p.getFiscalizador()==null?null:p.getFiscalizador().getId(),p.getFiscalizador()==null?null:p.getFiscalizador().getNombre(),p.getProgramacionAnterior()==null?null:p.getProgramacionAnterior().getId(),p.getMotivoReprogramacion(),p.getMotivoCancelacion(),p.getMotivoSeguimiento(),p.getRevisionOrigen()==null?null:p.getRevisionOrigen().getId());}
     private void asegurarNoCerrado(ExpedienteFiscalizacion e){if(e.getEstado()==EstadoExpediente.CERRADO||e.getEstado()==EstadoExpediente.CANCELADO)throw new ConflictException("El expediente está cerrado o cancelado y no admite operaciones.");}

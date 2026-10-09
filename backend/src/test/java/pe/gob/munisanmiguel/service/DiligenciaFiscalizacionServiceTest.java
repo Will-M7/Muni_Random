@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 import pe.gob.munisanmiguel.dto.ApiDtos.InicioDiligenciaRequest;
 import pe.gob.munisanmiguel.dto.ApiDtos.NoRealizadaRequest;
+import pe.gob.munisanmiguel.dto.ApiDtos.RegistroPosteriorDiligenciaRequest;
 import pe.gob.munisanmiguel.entity.*;
 import pe.gob.munisanmiguel.exception.ConflictException;
 import pe.gob.munisanmiguel.repository.*;
@@ -27,7 +28,7 @@ class DiligenciaFiscalizacionServiceTest {
         f.expediente.setId(10L);f.expediente.setCodigo("FIS-TEST");f.expediente.setOrigen(OrigenFiscalizacion.INICIATIVA_MUNICIPAL);
         f.expediente.setObjetoFiscalizacion("Verificar hechos de prueba");f.expediente.setEstado(EstadoExpediente.ABIERTO);
         f.expediente.setDireccionFiscalizada("Dirección ficticia de prueba");f.programacion.setId(20L);f.programacion.setExpediente(f.expediente);
-        f.programacion.setFiscalizador(f.fiscalizador);f.programacion.setFecha(LocalDate.now().plusDays(1));f.programacion.setHora(LocalTime.of(10,0));
+        f.programacion.setFiscalizador(f.fiscalizador);f.programacion.setFecha(LocalDate.now(java.time.ZoneId.of("America/Lima")));f.programacion.setHora(LocalTime.of(10,0));
         f.programacion.setTipoVisita(TipoVisita.PROGRAMADA);f.programacion.setEstadoProgramacion(EstadoProgramacion.PROGRAMADA);
         when(f.users.findByUsernameIgnoreCaseAndActivoTrue("fiscalizador")).thenReturn(Optional.of(f.actor));
         when(f.users.findByUsernameIgnoreCaseAndActivoTrue("otro")).thenReturn(Optional.of(new AppUser()));
@@ -39,7 +40,7 @@ class DiligenciaFiscalizacionServiceTest {
         when(f.participants.findAllByDiligenciaIdOrderByCreadoEnAscIdAsc(any())).thenReturn(List.of());
         when(f.evidences.findAllByDiligenciaIdOrderByFechaHoraAscIdAsc(any())).thenReturn(List.of());
         f.service=new DiligenciaFiscalizacionService(f.programs,f.diligences,f.participants,f.evidences,f.actas,f.users,
-                f.history,mock(FiscalizacionFileStorageService.class),mock(DocumentoStorageService.class),
+                f.history,f.storage,mock(DocumentoStorageService.class),
                 new ActaPdfService(),new ObjectMapper().findAndRegisterModules(),f.revisions);
         return f;
     }
@@ -79,13 +80,32 @@ class DiligenciaFiscalizacionServiceTest {
         verify(f.diligences,never()).saveAndFlush(any());
     }
 
-    @Test void programacionPasadaSeMarcaVencidaSinCerrarElExpediente(){
+    @Test void inicioDespuesDelDiaProgramadoNoModificaElEstadoHistorico(){
         var f=fixture();f.programacion.setFecha(LocalDate.of(2000,1,1));f.programacion.setHora(LocalTime.NOON);
-        var workspace=f.service.iniciar(20L,new InicioDiligenciaRequest(EstadoGps.NO_DISPONIBLE,null,null),"fiscalizador");
-        assertEquals("VENCIDA",workspace.estadoProgramacion());
+        assertThrows(ConflictException.class,()->f.service.iniciar(20L,new InicioDiligenciaRequest(EstadoGps.NO_DISPONIBLE,null,null),"fiscalizador"));
+        assertEquals(EstadoProgramacion.PROGRAMADA,f.programacion.getEstadoProgramacion());
         assertEquals(EstadoExpediente.ABIERTO,f.expediente.getEstado());
-        assertNull(workspace.id());verify(f.diligences,never()).saveAndFlush(any());
-        verify(f.history).save(argThat(h->h.getTipoEvento().equals("PROGRAMACION_VENCIDA")&&h.getActorUsername().equals("fiscalizador")));
+        verify(f.diligences,never()).saveAndFlush(any());
+        verify(f.history,never()).save(any());
+    }
+
+    @Test void inicioDisponibleHastaElFinalDelDiaAunquePasoLaHoraProgramada(){
+        var f=fixture();f.programacion.setFecha(LocalDate.now(java.time.ZoneId.of("America/Lima")));
+        f.programacion.setHora(LocalTime.MIDNIGHT);
+        f.service.iniciar(20L,new InicioDiligenciaRequest(EstadoGps.NO_DISPONIBLE,null,null),"fiscalizador");
+        assertEquals(EstadoProgramacion.EN_CURSO,f.programacion.getEstadoProgramacion());
+    }
+
+    @Test void estadoVencidoPrematuramenteHoyNoImpideIniciar(){
+        var f=fixture();f.programacion.setEstadoProgramacion(EstadoProgramacion.VENCIDA);
+        f.service.iniciar(20L,new InicioDiligenciaRequest(EstadoGps.NO_DISPONIBLE,null,null),"fiscalizador");
+        assertEquals(EstadoProgramacion.EN_CURSO,f.programacion.getEstadoProgramacion());
+    }
+
+    @Test void visitaDeUnDiaFuturoNoSeIniciaAnticipadamente(){
+        var f=fixture();f.programacion.setFecha(LocalDate.now(java.time.ZoneId.of("America/Lima")).plusDays(1));
+        assertThrows(ConflictException.class,()->f.service.iniciar(20L,new InicioDiligenciaRequest(EstadoGps.NO_DISPONIBLE,null,null),"fiscalizador"));
+        assertEquals(EstadoProgramacion.PROGRAMADA,f.programacion.getEstadoProgramacion());
     }
 
     @Test void noRealizadaAceptaMotivoTipadoSinDetalleYDejaExpedienteAbierto(){
@@ -94,6 +114,48 @@ class DiligenciaFiscalizacionServiceTest {
         assertEquals("NO_REALIZADA",result.estadoProgramacion());assertEquals("NO_REALIZADA",result.estadoDiligencia());
         assertEquals(EstadoExpediente.ABIERTO,f.expediente.getEstado());
         verify(f.history).save(argThat(h->h.getTipoEvento().equals("DILIGENCIA_NO_REALIZADA")&&h.getFechaHora()!=null));
+    }
+
+    @Test void registroPosteriorVencidoConservaHoraProgramadaComoReferencia(){
+        var f=fixture();f.programacion.setEstadoProgramacion(EstadoProgramacion.VENCIDA);
+        f.programacion.setFecha(LocalDate.of(2000,1,1));f.programacion.setHora(LocalTime.of(23,59));
+        var result=f.service.registrarPosterior(20L,new RegistroPosteriorDiligenciaRequest(null,null),"fiscalizador");
+        assertEquals("EN_CURSO",result.estadoProgramacion());assertTrue(result.registroPosterior());
+        assertEquals("PROGRAMADA",result.origenHoraEjecucion());
+        assertEquals(LocalDate.of(2000,1,1),result.fechaHoraEjecucion().toLocalDate());
+        assertEquals(LocalTime.of(23,59),result.fechaHoraEjecucion().toLocalTime());
+        assertNotNull(result.registradoEn());assertEquals("fiscalizador",result.registradoPor());
+        assertNull(result.acta());
+    }
+
+    @Test void registroPosteriorAceptaHorasLimiteDeclaradas(){
+        for(var hour:List.of(LocalTime.MIDNIGHT,LocalTime.of(23,59))){
+            var f=fixture();f.programacion.setEstadoProgramacion(EstadoProgramacion.VENCIDA);
+            f.programacion.setFecha(LocalDate.of(2000,1,1));f.programacion.setHora(LocalTime.NOON);
+            var result=f.service.registrarPosterior(20L,new RegistroPosteriorDiligenciaRequest(LocalDate.of(2000,1,2),hour),"fiscalizador");
+            assertEquals("DECLARADA",result.origenHoraEjecucion());assertEquals(hour,result.fechaHoraEjecucion().toLocalTime());
+        }
+    }
+
+    @Test void registroPosteriorRechazaCanceladaYReprogramada(){
+        for(var state:List.of(EstadoProgramacion.CANCELADA,EstadoProgramacion.REPROGRAMADA)){
+            var f=fixture();f.programacion.setEstadoProgramacion(state);f.programacion.setFecha(LocalDate.of(2000,1,1));
+            assertThrows(ConflictException.class,()->f.service.registrarPosterior(20L,new RegistroPosteriorDiligenciaRequest(null,null),"fiscalizador"));
+            verify(f.diligences,never()).saveAndFlush(any());
+        }
+    }
+
+    @Test void registroPosteriorAjenoEsDenegado(){
+        var f=fixture();f.programacion.setEstadoProgramacion(EstadoProgramacion.VENCIDA);f.programacion.setFecha(LocalDate.of(2000,1,1));
+        assertThrows(AccessDeniedException.class,()->f.service.registrarPosterior(20L,new RegistroPosteriorDiligenciaRequest(null,null),"otro"));
+    }
+
+    @Test void archivoDeDiligenciaAjenaEsDenegadoAntesDeLeerDisco(){
+        var f=fixture();var d=new DiligenciaFiscalizacion();d.setId(30L);d.setProgramacion(f.programacion);
+        var e=new EvidenciaFiscalizacion();e.setId(40L);e.setDiligencia(d);e.setNombreInterno("archivo.pdf");
+        when(f.evidences.findByIdAndDiligenciaId(40L,30L)).thenReturn(Optional.of(e));
+        assertThrows(AccessDeniedException.class,()->f.service.evidencia(30L,40L,"otro",true));
+        verifyNoInteractions(f.storage);
     }
 
     private static class Fixture {
@@ -105,6 +167,7 @@ class DiligenciaFiscalizacionServiceTest {
         final AppUserRepository users=mock(AppUserRepository.class);
         final ExpedienteHistorialRepository history=mock(ExpedienteHistorialRepository.class);
         final RevisionFiscalizacionRepository revisions=mock(RevisionFiscalizacionRepository.class);
+        final FiscalizacionFileStorageService storage=mock(FiscalizacionFileStorageService.class);
         final Fiscalizador fiscalizador=new Fiscalizador();final AppUser actor=new AppUser();
         final ExpedienteFiscalizacion expediente=new ExpedienteFiscalizacion();final ProgramacionFiscalizacion programacion=new ProgramacionFiscalizacion();
         DiligenciaFiscalizacionService service;

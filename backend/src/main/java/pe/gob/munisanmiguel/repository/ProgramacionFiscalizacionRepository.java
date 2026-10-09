@@ -13,6 +13,7 @@ import java.util.List;
 
 public interface ProgramacionFiscalizacionRepository extends JpaRepository<ProgramacionFiscalizacion,Long> {
     List<ProgramacionFiscalizacion> findAllByOrderByFechaAscHoraAsc();
+    List<ProgramacionFiscalizacion> findAllByFechaOrderByHoraAscIdAsc(LocalDate fecha);
     List<ProgramacionFiscalizacion> findAllByExpedienteIdOrderByIdAsc(Long expedienteId);
     List<ProgramacionFiscalizacion> findAllByFiscalizadorIdAndEstadoProgramacionInOrderByFechaAscHoraAsc(String fiscalizadorId,List<EstadoProgramacion> estados);
     List<ProgramacionFiscalizacion> findAllByFiscalizadorIdOrderByIdAsc(String fiscalizadorId);

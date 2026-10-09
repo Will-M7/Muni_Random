@@ -21,8 +21,11 @@ public class ActaPdfService {
         field(lines,"Documento",v(acta,"documentoAdministrado"));
         field(lines,"Lugar",v(acta,"lugar"));
         field(lines,"Fecha",v(acta,"fecha"));
-        field(lines,"Hora de apertura",v(acta,"fechaInicio"));
-        field(lines,"Hora de cierre",v(acta,"fechaCierre"));
+        boolean posterior=Boolean.TRUE.equals(acta.get("registroPosterior"));
+        String source=v(acta,"origenHoraEjecucion");
+        field(lines,posterior&&"PROGRAMADA".equals(source)?"Hora programada referencial":posterior?"Hora de ejecución declarada":"Hora de apertura",v(acta,"fechaInicio"));
+        field(lines,posterior?"Instante de cierre del registro":"Hora de cierre",v(acta,"fechaCierre"));
+        if(posterior){field(lines,"Registrado posteriormente en",v(acta,"registradoEn"));field(lines,"Registrado por",v(acta,"registradoPor"));}
         field(lines,"Objeto de fiscalización",v(acta,"objetoFiscalizacion"));
         field(lines,"Tipo de visita",v(acta,"tipoVisita"));
         section(lines,"2. FISCALIZADORES Y PARTICIPANTES");

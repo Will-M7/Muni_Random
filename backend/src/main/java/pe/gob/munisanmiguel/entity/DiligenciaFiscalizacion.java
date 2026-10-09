@@ -42,6 +42,11 @@ public class DiligenciaFiscalizacion {
     @Enumerated(EnumType.STRING) @Column(name="medio_entrega",nullable=false,length=24) private MedioEntrega medioEntrega;
     @Column(name="created_at",nullable=false) private LocalDateTime createdAt;
     @Column(name="updated_at",nullable=false) private LocalDateTime updatedAt;
+    @Column(name="registro_posterior",nullable=false) private boolean registroPosterior;
+    @Column(name="registrado_en") private LocalDateTime registradoEn;
+    @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="registrado_por_id") private AppUser registradoPor;
+    @Column(name="fecha_hora_ejecucion") private LocalDateTime fechaHoraEjecucion;
+    @Enumerated(EnumType.STRING) @Column(name="origen_hora_ejecucion",length=20) private OrigenHoraEjecucion origenHoraEjecucion;
     @Version @Column(nullable=false) private Long version;
     @OneToMany(mappedBy="diligencia",fetch=FetchType.LAZY) @OrderBy("creadoEn ASC, id ASC") private List<DiligenciaParticipante> participantes=new ArrayList<>();
     @OneToMany(mappedBy="diligencia",fetch=FetchType.LAZY) @OrderBy("fechaHora ASC, id ASC") private List<EvidenciaFiscalizacion> evidencias=new ArrayList<>();

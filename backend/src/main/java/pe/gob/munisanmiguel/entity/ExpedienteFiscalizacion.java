@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@Entity @Table(name="expediente_fiscalizacion") @Getter @Setter @NoArgsConstructor
+@Entity @Table(name="expediente_fiscalizacion",uniqueConstraints=@UniqueConstraint(name="uk_expediente_solicitud_externa",columnNames={"dependencia_procedencia","referencia_solicitud"})) @Getter @Setter @NoArgsConstructor
 public class ExpedienteFiscalizacion {
     @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
     @Column(nullable=false,unique=true,length=30) private String codigo;
@@ -16,6 +16,8 @@ public class ExpedienteFiscalizacion {
     @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="creado_por_id") private AppUser creadoPor;
     @Enumerated(EnumType.STRING) @Column(nullable=false,length=30) private OrigenFiscalizacion origen;
     @Column(name="detalle_origen",length=500) private String detalleOrigen;
+    @Column(name="dependencia_procedencia",length=160) private String dependenciaProcedencia;
+    @Column(name="referencia_solicitud",length=160) private String referenciaSolicitud;
     @Enumerated(EnumType.STRING) @Column(nullable=false,length=30) private EstadoExpediente estado;
     @Column(name="objeto_fiscalizacion",nullable=false,length=255) private String objetoFiscalizacion;
     @Column(name="observaciones_iniciales",columnDefinition="TEXT") private String observacionesIniciales;

@@ -8,8 +8,10 @@ import { AuthService } from '../../services/auth.service';
 import { FiscalizadorTarea, VerificacionService } from '../../services/verificacion.service';
 import { ResultadoFiscalizacion } from '../../models/solicitud.model';
 import { todayPeru } from '../../core/date';
+import { formatTimeDual } from '../../core/time';
 
 type Coordenadas = [number, number];
+type TareaConCoordenadas = FiscalizadorTarea & {latitud:number;longitud:number};
 
 @Component({
   selector: 'app-fiscalizador',
@@ -18,7 +20,8 @@ type Coordenadas = [number, number];
   styleUrls: ['./fiscalizador.css', './fiscalizador-clarification.css'],
 })
 export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
-  @ViewChild('routeMap') routeMap?: ElementRef<HTMLDivElement>;
+  private routeMap?: ElementRef<HTMLDivElement>;
+  @ViewChild('routeMap') set routeMapElement(element:ElementRef<HTMLDivElement>|undefined){this.routeMap=element;if(element)setTimeout(()=>this.actualizarMapa());}
 
   fecha = todayPeru();
   tareasDia: FiscalizadorTarea[] = [];
@@ -33,6 +36,7 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   cargando = false;
   gpsCargando = false;
   guardando = false;
+  descargando = false;
   error = '';
   gpsMensaje = '';
   reporte: File | null = null;
@@ -57,13 +61,13 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   get pendientes() { return this.tareasDia.filter(t => t.resultado === 'PENDIENTE'); }
   get realizadas() { return this.tareasDia.filter(t => t.resultado === 'REALIZADA'); }
   get noRealizadas() { return this.tareasDia.filter(t => t.resultado === 'NO_REALIZADA'); }
-  get puntosRuta() { return this.pendientes; }
+  get puntosRuta():TareaConCoordenadas[] { return this.pendientes.filter((t):t is TareaConCoordenadas=>this.coordenadasValidas(t)); }
+  get sinCoordenadas():FiscalizadorTarea[]{return this.pendientes.filter(t=>!this.coordenadasValidas(t));}
   get distanciaRutaKm() { return this.calcularRuta().distanciaKm; }
   get rutaOrdenada() { return this.calcularRuta().orden; }
   cerrarSesion(): void { this.auth.logout(); void this.router.navigate(['/login']); }
 
   async ngOnInit(): Promise<void> {
-    this.restaurarUbicacion();
     this.actualizarVista(this.router.url);
     this.navigationSubscription = this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(e => {
       this.actualizarVista((e as NavigationEnd).urlAfterRedirects);
@@ -90,10 +94,10 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
         this.auth.hasCapability('ACLARACION_RESPONDER') ? this.service.misAclaraciones() : Promise.resolve([]),
       ]);
       this.aclaraciones = aclaraciones;
-      const tareasExpediente = asignaciones.filter(t => t.latitud !== null && t.longitud !== null).map(t => ({
+      const tareasExpediente = asignaciones.map(t => ({
         codigo:t.codigo, ciudadano:t.administrado || 'Administrado sin identificar', dni:t.documentoAdministrado || '',
         telefono:t.telefono || '', direccion:t.direccion || '', referencia:t.referencia || '', fecha:t.fecha, hora:t.hora,
-        latitud:t.latitud!, longitud:t.longitud!, documento:'', resultado:(t.estadoProgramacion==='REALIZADA'?'REALIZADA':t.estadoProgramacion==='NO_REALIZADA'?'NO_REALIZADA':'PENDIENTE') as 'PENDIENTE'|'REALIZADA'|'NO_REALIZADA', estadoSolicitud:t.estadoExpediente,
+        latitud:t.latitud, longitud:t.longitud, documento:'', resultado:(t.estadoProgramacion==='REALIZADA'?'REALIZADA':t.estadoProgramacion==='NO_REALIZADA'?'NO_REALIZADA':'PENDIENTE') as 'PENDIENTE'|'REALIZADA'|'NO_REALIZADA', estadoSolicitud:t.estadoExpediente,
         esExpediente:true, objetoFiscalizacion:t.objetoFiscalizacion, estadoProgramacion:t.estadoProgramacion,
         tipoVisita:t.tipoVisita, origen:t.origen, programacionId:t.programacionId, diligenciaId:t.diligenciaId, estadoDiligencia:t.estadoDiligencia,
       }));
@@ -113,6 +117,8 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async cambiarFecha(): Promise<void> { await this.cargar(); }
+  horaDual(value:string|null|undefined):string{return formatTimeDual(value);}
+  async descargarJornada():Promise<void>{this.descargando=true;this.error='';try{const blob=await this.service.descargarJornada(this.fecha);const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`visitas-pendientes-${this.fecha}.html`;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}catch(e:any){this.error=e?.error?.message||'No se pudo descargar la jornada.';}finally{this.descargando=false;this.cdr.markForCheck();}}
   cancelarRespuestaAclaracion(id:number):void{delete this.respuestasAclaracion[id];this.error='';this.cdr.markForCheck();}
   async responderAclaracion(id:number):Promise<void>{const response=this.respuestasAclaracion[id]?.trim();if(!response)return;this.guardando=true;this.error='';try{await this.service.responderAclaracion(id,response);delete this.respuestasAclaracion[id];this.aclaraciones=await this.service.misAclaraciones();}catch(e:any){this.error=e?.error?.message||'No se pudo responder la aclaración.';}finally{this.guardando=false;this.cdr.markForCheck();}}
   async cambiarFiltroHistorial(): Promise<void> { await this.cargar(); }
@@ -126,7 +132,6 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
         this.ubicacionActual = [position.coords.latitude, position.coords.longitude];
         this.ubicacionActualTexto = `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`;
         this.ubicacionActualizada = new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Lima' }).format(new Date());
-        localStorage.setItem('sm_fiscalizador_ubicacion', JSON.stringify({ coordenadas: this.ubicacionActual, actualizado: this.ubicacionActualizada }));
         this.gpsMensaje = 'Ubicación actualizada.'; this.gpsCargando = false; this.cdr.markForCheck(); this.actualizarMapa();
       },
       () => { this.gpsCargando = false; this.gpsMensaje = 'No se pudo obtener la ubicación. Puedes continuar sin GPS.'; this.cdr.markForCheck(); },
@@ -155,19 +160,22 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
     finally { this.guardando = false; this.cdr.markForCheck(); }
   }
 
-  verEnMapa(tarea: FiscalizadorTarea): void { this.seleccionada = tarea; setTimeout(() => { this.actualizarMapa(); this.mapa?.setView([tarea.latitud, tarea.longitud], 16); }); }
-  abrirGoogleMaps(tarea: FiscalizadorTarea): void { if (!this.ubicacionActual) { this.gpsMensaje = 'Actualiza tu ubicación antes de abrir una ruta.'; this.cdr.markForCheck(); return; } const origen = this.ubicacionActual; const url = `https://www.google.com/maps/dir/?api=1&origin=${origen[0]},${origen[1]}&destination=${tarea.latitud},${tarea.longitud}&travelmode=driving`; window.open(url, '_blank', 'noopener'); }
-  abrirDomicilio(tarea: FiscalizadorTarea): void { window.open(`https://www.google.com/maps/search/?api=1&query=${tarea.latitud},${tarea.longitud}`, '_blank', 'noopener'); }
-  abrirRecorridoCompleto(): void { const orden = this.rutaOrdenada; if (!orden.length || !this.ubicacionActual) { this.gpsMensaje = 'Actualiza tu ubicación para abrir el recorrido completo.'; this.cdr.markForCheck(); return; } const origen = this.ubicacionActual; const destino = orden[orden.length - 1]; const waypoints = orden.slice(0, -1).map(t => `${t.latitud},${t.longitud}`).join('|'); const url = `https://www.google.com/maps/dir/?api=1&origin=${origen[0]},${origen[1]}&destination=${destino.latitud},${destino.longitud}${waypoints ? `&waypoints=${encodeURIComponent(waypoints)}` : ''}&travelmode=driving`; window.open(url, '_blank', 'noopener'); }
+  verEnMapa(tarea: FiscalizadorTarea): void { if(!this.coordenadasValidas(tarea)){this.gpsMensaje='Esta visita no tiene coordenadas válidas; consulta la dirección disponible.';this.cdr.markForCheck();return;}this.seleccionada = tarea; const point:Coordenadas=[tarea.latitud,tarea.longitud];setTimeout(() => { this.actualizarMapa(); this.mapa?.setView(point, 16); }); }
+  abrirGoogleMaps(tarea: FiscalizadorTarea): void { if(!this.coordenadasValidas(tarea)||!this.ubicacionActual){this.abrirDomicilio(tarea);return;}const origen=this.ubicacionActual;const url=`https://www.google.com/maps/dir/?api=1&origin=${origen[0]},${origen[1]}&destination=${tarea.latitud},${tarea.longitud}&travelmode=driving`;window.open(url,'_blank','noopener'); }
+  abrirDomicilio(tarea: FiscalizadorTarea): void { const destino=this.coordenadasValidas(tarea)?`${tarea.latitud},${tarea.longitud}`:tarea.direccion;if(!destino){this.gpsMensaje='Esta visita no tiene ubicación suficiente.';this.cdr.markForCheck();return;}window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destino)}`, '_blank', 'noopener'); }
+  abrirRecorridoCompleto(): void { const orden=this.rutaOrdenada;if(!orden.length)return;if(orden.length===1&&!this.ubicacionActual){this.abrirDomicilio(orden[0]);return;}const origen=this.ubicacionActual||[orden[0].latitud,orden[0].longitud];const stops=this.ubicacionActual?orden:orden.slice(1);const destino=stops.at(-1)!;const waypoints=stops.slice(0,-1).map(t=>`${t.latitud},${t.longitud}`).join('|');const url=`https://www.google.com/maps/dir/?api=1&origin=${origen[0]},${origen[1]}&destination=${destino.latitud},${destino.longitud}${waypoints?`&waypoints=${encodeURIComponent(waypoints)}`:''}&travelmode=driving`;window.open(url,'_blank','noopener'); }
 
-  private calcularRuta(): { orden: FiscalizadorTarea[]; distanciaKm: number } {
-    const pendientes = [...this.puntosRuta]; if (!pendientes.length || !this.ubicacionActual) return { orden: [], distanciaKm: 0 };
-    let actual = this.ubicacionActual; let distancia = 0; const orden: FiscalizadorTarea[] = [];
-    while (pendientes.length) { pendientes.sort((a, b) => this.distancia(actual, [a.latitud, a.longitud]) - this.distancia(actual, [b.latitud, b.longitud])); const siguiente = pendientes.shift()!; distancia += this.distancia(actual, [siguiente.latitud, siguiente.longitud]); orden.push(siguiente); actual = [siguiente.latitud, siguiente.longitud]; }
+  private calcularRuta(): { orden: TareaConCoordenadas[]; distanciaKm: number } {
+    const pendientes = [...this.puntosRuta]; if (!pendientes.length) return { orden: [], distanciaKm: 0 };
+    let actual:Coordenadas|null=this.ubicacionActual; let distancia = 0; const orden: TareaConCoordenadas[] = [];
+    while (pendientes.length) { pendientes.sort((a,b)=>this.ubicacionActual
+      ?this.distancia(actual!,[a.latitud,a.longitud])-this.distancia(actual!,[b.latitud,b.longitud])||a.hora.localeCompare(b.hora)
+      :a.hora.localeCompare(b.hora)||(actual?this.distancia(actual,[a.latitud,a.longitud])-this.distancia(actual,[b.latitud,b.longitud]):a.codigo.localeCompare(b.codigo)));
+      const siguiente = pendientes.shift()!;if(actual)distancia += this.distancia(actual, [siguiente.latitud, siguiente.longitud]); orden.push(siguiente); actual = [siguiente.latitud, siguiente.longitud]; }
     return { orden, distanciaKm: Number(distancia.toFixed(2)) };
   }
   private distancia(a: Coordenadas, b: Coordenadas): number { const r = 6371; const dLat = (b[0] - a[0]) * Math.PI / 180; const dLon = (b[1] - a[1]) * Math.PI / 180; const x = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.sin(dLon / 2) ** 2; return r * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)); }
-  private restaurarUbicacion(): void { try { const raw = localStorage.getItem('sm_fiscalizador_ubicacion'); if (!raw) return; const saved = JSON.parse(raw); if (Array.isArray(saved.coordenadas) && saved.coordenadas.length === 2) { this.ubicacionActual = [Number(saved.coordenadas[0]), Number(saved.coordenadas[1])]; this.ubicacionActualTexto = `${this.ubicacionActual[0].toFixed(6)}, ${this.ubicacionActual[1].toFixed(6)}`; this.ubicacionActualizada = saved.actualizado || ''; } } catch { localStorage.removeItem('sm_fiscalizador_ubicacion'); } }
+  private coordenadasValidas(t:FiscalizadorTarea):t is TareaConCoordenadas{return t.latitud!==null&&t.longitud!==null&&Number.isFinite(t.latitud)&&Number.isFinite(t.longitud)&&Math.abs(t.latitud)<=90&&Math.abs(t.longitud)<=180;}
 
   private actualizarMapa(): void {
     if (!this.routeMap?.nativeElement) return;
@@ -177,7 +185,7 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
     this.mapa.eachLayer(layer => { if (layer instanceof L.Marker) this.mapa?.removeLayer(layer); });
     const markers: L.LatLngExpression[] = [];
     if (this.ubicacionActual) { L.marker(this.ubicacionActual, { icon: L.divIcon({ className: 'route-marker current-marker', html: '<span>0</span>', iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(this.mapa).bindPopup('Ubicación actual'); markers.push(this.ubicacionActual); }
-    this.puntosRuta.forEach((tarea, index) => { const point: L.LatLngExpression = [tarea.latitud, tarea.longitud]; L.marker(point, { icon: L.divIcon({ className: 'route-marker', html: `<span>${index + 1}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(this.mapa!).bindPopup(`<strong>${tarea.hora.slice(0, 5)}</strong><br>${tarea.ciudadano}<br>${tarea.direccion}<br>${tarea.codigo}`); markers.push(point); });
+    this.puntosRuta.forEach((tarea, index) => { const point: L.LatLngExpression = [tarea.latitud, tarea.longitud]; const popup=document.createElement('div');const summary=document.createElement('strong');summary.textContent=`${tarea.hora.slice(0,5)} · ${tarea.codigo}`;const detail=document.createElement('p');detail.textContent=`${tarea.ciudadano} · ${tarea.direccion||'Sin dirección'}`;const link=document.createElement('a');link.href=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${tarea.latitud},${tarea.longitud}`)}`;link.target='_blank';link.rel='noopener';link.textContent='Navegar con Google Maps';popup.append(summary,detail,link);L.marker(point, { icon: L.divIcon({ className: 'route-marker', html: `<span>${index + 1}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(this.mapa!).bindPopup(popup); markers.push(point); });
     if (markers.length > 1) this.mapa.fitBounds(L.latLngBounds(markers), { padding: [20, 20], maxZoom: 16 });
     this.mapa.invalidateSize({ pan: false });
   }

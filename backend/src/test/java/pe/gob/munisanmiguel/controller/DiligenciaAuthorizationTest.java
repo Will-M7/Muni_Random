@@ -47,6 +47,29 @@ class DiligenciaAuthorizationTest {
         verify(service).iniciar(eq(7L),any(),eq("user"));
     }
 
+    @Test @WithMockUser(authorities="DILIGENCIA_INICIAR")
+    void capacidadDeInicioHabilitaRegistroPosteriorPropio() throws Exception {
+        mvc.perform(post("/api/fiscalizador/programaciones/7/diligencia/registrar-posterior")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"fechaEjecucion\":\"2026-10-08\",\"horaEjecucion\":\"23:59\"}"))
+                .andExpect(status().isOk());
+        verify(service).registrarPosterior(eq(7L),any(),eq("user"));
+    }
+
+    @Test @WithMockUser(authorities="TAREAS_PROPIAS_VER")
+    void soloConsultaNoPermiteRegistroPosterior() throws Exception {
+        mvc.perform(post("/api/fiscalizador/programaciones/7/diligencia/registrar-posterior")
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test @WithMockUser(authorities="DILIGENCIA_EDITAR_PROPIA")
+    void personaAusenteUsaElEnumAceptadoPorBackend() throws Exception {
+        mvc.perform(patch("/api/fiscalizador/diligencias/9").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"situacionPersona\":\"ADMINISTRADO_AUSENTE\"}"))
+                .andExpect(status().isOk());
+        verify(service).guardar(eq(9L),argThat(r->r.situacionPersona()==pe.gob.munisanmiguel.entity.SituacionPersona.ADMINISTRADO_AUSENTE),eq("user"));
+    }
+
     @Test @WithMockUser(authorities="ACTA_VER")
     void municipioConActaVerPuedeConsultarActas() throws Exception {
         when(service.actasExpediente("FIS-TEST","user",false)).thenReturn(java.util.List.of());

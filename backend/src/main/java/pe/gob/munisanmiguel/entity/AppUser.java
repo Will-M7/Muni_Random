@@ -17,7 +17,7 @@ public class AppUser {
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "user_role", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<AppRole> roles = new LinkedHashSet<>();
-    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "fiscalizador_id") private Fiscalizador fiscalizador;
+    @OneToOne(fetch = FetchType.LAZY) @JoinColumn(name = "fiscalizador_id",unique=true) private Fiscalizador fiscalizador;
     @Column(nullable = false) private boolean activo;
     @Column(name = "created_at", nullable = false, updatable = false) private java.time.LocalDateTime createdAt;
 }

@@ -9,7 +9,8 @@
 
   <nav aria-label="Navegación principal">
     <a *ngIf="authService.hasCapability('EXPEDIENTE_VER')" routerLink="/expedientes" routerLinkActive="active">Fiscalizaciones</a>
-    <a *ngIf="authService.hasCapability('EXPEDIENTE_CREAR')" routerLink="/expedientes/nuevo" routerLinkActive="active">Nuevo expediente</a>
+    <a *ngIf="authService.hasCapability('EXPEDIENTE_CREAR')" routerLink="/expedientes/nuevo" routerLinkActive="active">Crear fiscalización</a>
+    <a *ngIf="(authService.session?.roles?.includes('MUNICIPIO') || authService.session?.rol === 'MUNICIPIO') && authService.hasCapability('REVISION_VER')" routerLink="/revisiones" routerLinkActive="active">Pendientes de revisión</a>
     <a *ngIf="esMunicipio && puedeVerUsuarios" routerLink="/usuarios" routerLinkActive="active">Usuarios</a>
     <a *ngIf="esAdmin" routerLink="/admin" routerLinkActive="active">Administración</a>
   </nav>
