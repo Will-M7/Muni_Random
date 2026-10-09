@@ -1,3 +1,4 @@
 import { CanActivateFn, Router } from '@angular/router'; import { inject } from '@angular/core'; import { AuthService } from '../services/auth.service';
 export const authGuard:CanActivateFn=()=>{const auth=inject(AuthService);return auth.isAuthenticated()?true:inject(Router).createUrlTree(['/login']);};
 export const capabilityGuard:CanActivateFn=(route)=>{const auth=inject(AuthService);const router=inject(Router);if(!auth.isAuthenticated())return router.createUrlTree(['/login']);const capability=route.data['capability'] as string|undefined;return !capability||auth.hasCapability(capability)?true:router.createUrlTree([auth.hasCapability('ROLES_VER')?'/admin':auth.hasCapability('TAREAS_PROPIAS_VER')?'/fiscalizador':'/perfil']);};
+export const adminGuard:CanActivateFn=()=>{const auth=inject(AuthService);return auth.isAuthenticated()&&auth.session?.roles?.includes('ADMIN_SISTEMA')?true:inject(Router).createUrlTree(['/perfil']);};

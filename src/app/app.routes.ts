@@ -6,7 +6,6 @@ import { PredialComponent } from './pages/predial/predial';
 import { SolicitudesComponent } from './pages/solicitudes/solicitudes';
 import { MapaComponent } from './pages/mapa/mapa';
 import { PerfilComponent } from './pages/perfil/perfil';
-import { UsuariosComponent } from './pages/usuarios/usuarios';
 import { FiscalizadorComponent } from './pages/fiscalizador/fiscalizador';
 import { ExpedientesComponent } from './pages/expedientes/expedientes';
 import { ExpedienteNuevoComponent } from './pages/expedientes/expediente-nuevo';
@@ -14,7 +13,7 @@ import { ExpedienteDetalleComponent } from './pages/expedientes/expediente-detal
 import { AdminComponent } from './pages/admin/admin';
 import { DiligenciaComponent } from './pages/diligencia/diligencia';
 import { RevisionBandejaComponent, RevisionDetalleComponent } from './pages/expedientes/revision-fiscalizacion';
-import { authGuard, capabilityGuard } from './guards/auth.guard';
+import { authGuard, capabilityGuard, adminGuard } from './guards/auth.guard';
 
 const secured = (capability: string) => ({ canActivate: [authGuard, capabilityGuard], data: { capability } });
 
@@ -38,8 +37,8 @@ export const routes: Routes = [
   { path: 'fiscalizador', component: FiscalizadorComponent, ...secured('TAREAS_PROPIAS_VER') },
   { path: 'fiscalizador/ruta', component: FiscalizadorComponent, ...secured('RUTA_VER') },
   { path: 'fiscalizador/historial', component: FiscalizadorComponent, ...secured('TAREAS_PROPIAS_VER') },
-  { path: 'usuarios', component: UsuariosComponent, ...secured('USUARIOS_VER') },
-  { path: 'admin', component: AdminComponent, ...secured('ROLES_VER') },
+  { path: 'usuarios', redirectTo: 'admin', pathMatch: 'full' },
+  { path: 'admin', component: AdminComponent, canActivate:[authGuard,adminGuard] },
   { path: 'fiscalizador/diligencia/:programacionId', component: DiligenciaComponent, ...secured('DILIGENCIA_INICIAR') },
   { path: '**', redirectTo: 'login' },
 ];

@@ -83,3 +83,8 @@ Los PDF se guardan en `backend/uploads/solicitudes/` al ejecutar la API desde `b
 La integración externa se encuentra separada en `ReniecService`, `IdentityProvider` y `ReniecIdentityProvider`. Se configura mediante `RENIEC_BASE_URL` y las credenciales que entregue el proveedor oficial (`RENIEC_CLIENT_ID`, `RENIEC_CLIENT_SECRET` o `RENIEC_API_KEY`). No hay credenciales incluidas en el repositorio. Si falta `RENIEC_BASE_URL`, el endpoint devuelve `503` con `Consulta RENIEC no configurada.`. Los timeouts por defecto son 2 segundos de conexión y 4 segundos de lectura.
 
 El smoke test usa las credenciales demo de desarrollo, crea una solicitud temporal con `backend/src/test/resources/fixture-minimal.pdf`, verifica estado y documento, y elimina esa solicitud al finalizar. Puede apuntarse a otra API con `API_URL`.
+# Configuración administrativa dinámica
+
+La migración V21 crea ajustes individuales, el límite orientativo de la agenda y la configuración DNI. Configure `IDENTITY_MASTER_KEY` fuera del repositorio con 32 bytes aleatorios codificados en Base64 antes de guardar credenciales desde `/admin`. Conserve esa clave de forma segura: es necesaria para descifrar las credenciales tras reiniciar. Para RENIEC, configure además `RENIEC_ALLOWED_HOSTS` como lista de dominios HTTPS autorizados por el contrato de la entidad, separados por comas. El panel acepta la URL base del servicio documentado por la entidad y sus credenciales; no presupone un contrato oficial único.
+
+La opción PerúAPI utiliza expresamente **peruapi.com** y su endpoint `https://peruapi.com/api/dni/{dni}` con la cabecera `X-API-KEY`. No utiliza peruapi.net. El límite diario inicial es 5 y solo informa de la carga; la programación mantiene las reglas de conflictos existentes.

@@ -20,12 +20,14 @@ import java.util.List;
 public class FiscalizadorController {
     private final SolicitudService service;
     private final ExpedienteFiscalizacionService expedientes;
-    public FiscalizadorController(SolicitudService service, ExpedienteFiscalizacionService expedientes) { this.service = service; this.expedientes=expedientes; }
+    private final pe.gob.munisanmiguel.service.AdminSettingsService settings;
+    public FiscalizadorController(SolicitudService service, ExpedienteFiscalizacionService expedientes,pe.gob.munisanmiguel.service.AdminSettingsService settings) { this.service = service; this.expedientes=expedientes;this.settings=settings; }
     @GetMapping("/mis-tareas") @PreAuthorize("hasAuthority('TAREAS_PROPIAS_VER')") public List<FiscalizadorTaskResponse> tareas(@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate fecha, Authentication auth) { service.expirarPendientes(); return service.misTareas(auth, fecha); }
     @GetMapping("/mis-tareas/proximas") @PreAuthorize("hasAuthority('TAREAS_PROPIAS_VER')") public List<FiscalizadorTaskResponse> proximas(Authentication auth) { service.expirarPendientes(); return service.misProximas(auth); }
     @GetMapping("/mis-expedientes") @PreAuthorize("hasAuthority('TAREAS_PROPIAS_VER')") public List<FiscalizadorExpedienteTaskResponse> misExpedientes(Authentication auth) { service.expirarPendientes(); return expedientes.misTareasCampo(auth.getName()); }
     @GetMapping(value="/mis-visitas.html",produces=MediaType.TEXT_HTML_VALUE) @PreAuthorize("hasAuthority('TAREAS_PROPIAS_VER')")
     public ResponseEntity<byte[]> jornada(@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate fecha,Authentication auth){
+        if(!settings.forUser(auth.getName()).descargarJornadaHtml())throw new org.springframework.security.access.AccessDeniedException("La descarga HTML está desactivada para tu cuenta.");
         var d=expedientes.jornadaHtml(auth.getName(),fecha);
         return ResponseEntity.ok().contentType(new MediaType("text","html",StandardCharsets.UTF_8))
                 .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(d.filename(),StandardCharsets.UTF_8).build().toString())

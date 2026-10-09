@@ -49,7 +49,7 @@ public final class ApiDtos {
     public record ResultadoFiscalizacionRequest(@NotNull pe.gob.munisanmiguel.entity.ResultadoFiscalizacion resultado, String observaciones) {}
     public record UsuarioResponse(String username, String nombre, String rol, boolean activo, String fechaCreacion, List<String> roles,String fiscalizadorId,String fiscalizadorNombre) {}
     public record UsuarioRequest(@NotBlank String username, @NotBlank String nombre, @NotBlank @Size(min = 8) String password,
-                                 @NotBlank String confirmarPassword, @NotNull Rol rol, String fiscalizadorId) {}
+                                 String confirmarPassword, @NotNull Rol rol, String fiscalizadorId) {}
     public record RoleResponse(String nombre, String descripcion, boolean configurable, List<String> capacidades) {}
     public record CapabilityResponse(String codigo, String descripcion, String categoria) {}
     public record RoleCapabilitiesRequest(@NotNull List<String> capacidades) {}
@@ -63,7 +63,9 @@ public final class ApiDtos {
                                     java.math.BigDecimal latitud, java.math.BigDecimal longitud) {}
     public record CrearFiscalizacionRequest(@NotNull @Valid ExpedienteRequest expediente,
             @Size(max=160) String dependenciaProcedencia,@Size(max=160) String referenciaSolicitud,
-            @Valid ProgramacionRequest primeraProgramacion) {}
+            @Valid ProgramacionRequest primeraProgramacion,String metodoUbicacion,String enlaceGoogle) {
+        public CrearFiscalizacionRequest(ExpedienteRequest expediente,String dependenciaProcedencia,String referenciaSolicitud,ProgramacionRequest primeraProgramacion){this(expediente,dependenciaProcedencia,referenciaSolicitud,primeraProgramacion,null,null);}
+    }
     public record ExpedienteDocumentoResponse(Long id,String nombre,String tipoMime,long tamanoBytes,
             LocalDateTime adjuntadoEn,String adjuntadoPor) {}
     public record ProgramacionRequest(String fiscalizadorId, @NotNull LocalDate fecha, @NotNull LocalTime hora,

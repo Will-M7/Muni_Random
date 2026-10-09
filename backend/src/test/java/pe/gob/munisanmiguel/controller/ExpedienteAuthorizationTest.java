@@ -26,6 +26,8 @@ class ExpedienteAuthorizationTest {
     @MockitoBean pe.gob.munisanmiguel.repository.ProgramacionFiscalizacionRepository programaciones;
     @MockitoBean pe.gob.munisanmiguel.service.SolicitudService solicitudService;
     @MockitoBean JwtService jwt;
+    @MockitoBean pe.gob.munisanmiguel.service.RevisionFiscalizacionService revisions;
+    @MockitoBean pe.gob.munisanmiguel.service.AdminSettingsService settings;
     @MockitoBean AppUserRepository users;
 
     @Test @WithMockUser(authorities="EXPEDIENTE_VER")
@@ -73,12 +75,19 @@ class ExpedienteAuthorizationTest {
     }
     @Test @WithMockUser(authorities="TAREAS_PROPIAS_VER")
     void fiscalizadorDescargaSuJornadaHtml() throws Exception {
+        when(settings.forUser("user")).thenReturn(new pe.gob.munisanmiguel.service.AdminSettingsService.Preferences(true,true,true,true));
         when(service.jornadaHtml("user",java.time.LocalDate.of(2026,10,8))).thenReturn(
                 new ExpedienteFiscalizacionService.HtmlJornadaDownload("<!doctype html><p>Sin visitas</p>".getBytes(java.nio.charset.StandardCharsets.UTF_8),"visitas-pendientes-2026-10-08.html"));
         mvc.perform(get("/api/fiscalizador/mis-visitas.html").param("fecha","2026-10-08"))
                 .andExpect(status().isOk()).andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
                 .andExpect(header().string("Content-Disposition",org.hamcrest.Matchers.containsString("attachment")));
         verify(service).jornadaHtml("user",java.time.LocalDate.of(2026,10,8));
+    }
+    @Test @WithMockUser(authorities="TAREAS_PROPIAS_VER")
+    void fiscalizadorNoDescargaPorUrlSiEstaDesactivado() throws Exception {
+        when(settings.forUser("user")).thenReturn(new pe.gob.munisanmiguel.service.AdminSettingsService.Preferences(true,true,true,false));
+        mvc.perform(get("/api/fiscalizador/mis-visitas.html")).andExpect(status().isForbidden());
+        verify(service,org.mockito.Mockito.never()).jornadaHtml(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any());
     }
     @Test @WithMockUser(authorities="EXPEDIENTE_VER")
     void usuarioSinTareasNoDescargaJornadaAjena() throws Exception {

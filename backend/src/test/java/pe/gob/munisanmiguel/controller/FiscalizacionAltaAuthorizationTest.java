@@ -26,6 +26,7 @@ class FiscalizacionAltaAuthorizationTest {
     @Autowired MockMvc mvc;
     @MockitoBean AltaFiscalizacionService service;
     @MockitoBean JwtService jwt;
+    @MockitoBean pe.gob.munisanmiguel.service.AdminSettingsService settings;
     @MockitoBean AppUserRepository users;
 
     private MockMultipartFile payload(boolean programar){

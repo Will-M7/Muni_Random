@@ -17,6 +17,8 @@
     </header>
   </div>
 
+  <section class="daily-summary" aria-label="Resumen diario de visitas"><h2>Agenda por fecha</h2><p>La carga se calcula sobre visitas válidas programadas; las revisiones tienen su propio estado.</p><div class="daily-cards"><button type="button" *ngFor="let dia of resumen" class="daily-card" [class.selected]="agendaFecha===dia.fecha" [class.green]="dia.color==='verde'" [class.yellow]="dia.color==='amarillo'" [class.red]="dia.color==='rojo'" (click)="seleccionarFecha(dia.fecha)"><strong>{{dia.fecha|date:'dd/MM/yyyy'}}</strong><span>Por realizar: {{dia.pendientes}}</span><span>Realizadas: {{dia.realizadas}}</span><span>Revisión pendiente: {{dia.revisionesPendientes}}</span><b>Carga: {{dia.carga}} / {{dia.limite}}</b><small *ngIf="agendaFecha===dia.fecha"><span *ngFor="let item of dia.porFiscalizador|keyvalue">{{item.key}}: {{item.value}} · </span></small></button></div><p *ngIf="!resumen.length">Aún no hay visitas válidas en la agenda.</p><div *ngIf="agendaFecha" class="agenda-detail"><h3>Visitas del {{agendaFecha|date:'dd/MM/yyyy'}}</h3><div *ngFor="let visita of agendaSeleccionada"><strong>{{visita.hora|slice:0:5}}</strong> · {{visita.fiscalizadorNombre}} · {{visita.expedienteCodigo}} · {{visita.estado}}</div></div></section>
+
   <section class="review-filters" aria-label="Filtros de revisión">
     <label>
       <span class="review-filter-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Fecha de diligencia</span>

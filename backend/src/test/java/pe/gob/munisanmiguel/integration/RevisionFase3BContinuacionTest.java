@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Continues the persisted fixture without recreating any expediente or prior cycle. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = {
+        "spring.datasource.url=jdbc:mysql://localhost:3307/san_miguel_pruebas_v20?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=utf8",
         "app.storage.diligencias-path=target/fase3b-integrada/diligencias",
         "app.storage.path=target/fase3b-integrada/solicitudes"
 })

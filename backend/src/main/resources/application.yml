@@ -23,6 +23,9 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 app:
+  identity:
+    master-key: ${IDENTITY_MASTER_KEY:}
+    reniec-allowed-hosts: ${RENIEC_ALLOWED_HOSTS:}
   bootstrap-admin:
     username: ${ADMIN_BOOTSTRAP_USERNAME:}
     password: ${ADMIN_BOOTSTRAP_PASSWORD:}

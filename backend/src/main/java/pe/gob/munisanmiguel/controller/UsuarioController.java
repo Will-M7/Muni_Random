@@ -13,10 +13,11 @@ import java.util.List;
 @RestController @RequestMapping("/api/usuarios")
 public class UsuarioController {
     private final UsuarioService service;
-    public UsuarioController(UsuarioService service) { this.service = service; }
-    @GetMapping @PreAuthorize("hasAuthority('USUARIOS_VER')") public List<UsuarioResponse> listar() { return service.listar(); }
-    @GetMapping("/fiscalizadores-sin-cuenta") @PreAuthorize("hasAuthority('USUARIOS_CREAR')") public List<FiscalizadorDisponibleResponse> fiscalizadoresSinCuenta() { return service.fiscalizadoresSinCuenta(); }
-    @PostMapping @PreAuthorize("hasAuthority('USUARIOS_CREAR')") @ResponseStatus(HttpStatus.CREATED) public UsuarioResponse crear(@Valid @RequestBody UsuarioRequest request) { return service.crear(request); }
-    @PatchMapping("/{username}/estado") @PreAuthorize("hasAuthority('USUARIOS_ESTADO')") public UsuarioResponse estado(@PathVariable String username, @Valid @RequestBody pe.gob.munisanmiguel.dto.ApiDtos.UserActiveRequest request) { return service.cambiarEstado(username, request.activo()); }
-    @PutMapping("/{username}/roles") @PreAuthorize("hasAuthority('USUARIOS_EDITAR') or hasAuthority('ROLES_GESTIONAR')") public UsuarioResponse roles(@PathVariable String username, @Valid @RequestBody pe.gob.munisanmiguel.dto.ApiDtos.UserRolesRequest request) { return service.asignarRoles(username, request.roles(),request.fiscalizadorId()); }
+    private final pe.gob.munisanmiguel.service.AdminSettingsService settings;
+    public UsuarioController(UsuarioService service,pe.gob.munisanmiguel.service.AdminSettingsService settings) { this.service = service;this.settings=settings; }
+    @GetMapping @PreAuthorize("hasAuthority('USUARIOS_VER')") public List<UsuarioResponse> listar(org.springframework.security.core.Authentication auth) { settings.requireAdmin(auth.getName());return service.listar(); }
+    @GetMapping("/fiscalizadores-sin-cuenta") @PreAuthorize("hasAuthority('USUARIOS_CREAR')") public List<FiscalizadorDisponibleResponse> fiscalizadoresSinCuenta(org.springframework.security.core.Authentication auth) { settings.requireAdmin(auth.getName());return service.fiscalizadoresSinCuenta(); }
+    @PostMapping @PreAuthorize("hasAuthority('USUARIOS_CREAR')") @ResponseStatus(HttpStatus.CREATED) public UsuarioResponse crear(@Valid @RequestBody UsuarioRequest request,org.springframework.security.core.Authentication auth) { settings.requireAdmin(auth.getName());return service.crear(request); }
+    @PatchMapping("/{username}/estado") @PreAuthorize("hasAuthority('USUARIOS_ESTADO')") public UsuarioResponse estado(@PathVariable String username, @Valid @RequestBody pe.gob.munisanmiguel.dto.ApiDtos.UserActiveRequest request,org.springframework.security.core.Authentication auth) { settings.requireAdmin(auth.getName());return service.cambiarEstado(username, request.activo()); }
+    @PutMapping("/{username}/roles") @PreAuthorize("hasAuthority('USUARIOS_EDITAR') or hasAuthority('ROLES_GESTIONAR')") public UsuarioResponse roles(@PathVariable String username, @Valid @RequestBody pe.gob.munisanmiguel.dto.ApiDtos.UserRolesRequest request,org.springframework.security.core.Authentication auth) { settings.requireAdmin(auth.getName());return service.asignarRoles(username, request.roles(),request.fiscalizadorId()); }
 }

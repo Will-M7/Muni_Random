@@ -7,8 +7,7 @@ export function extractGoogleMapsCoordinates(input: string): [number, number] | 
   try { value = decodeURIComponent(url.href); } catch { return null; }
   const pair = [
     value.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/),
-    value.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/),
-    value.match(/[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)
+    value.match(/[?&](?:q|query)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)
   ].find(Boolean);
   if (!pair) return null;
   const lat = Number(pair[1]), lon = Number(pair[2]);

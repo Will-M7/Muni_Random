@@ -8,6 +8,7 @@ import { AuthService } from '../../services/auth.service';
 import { FiscalizadorTarea, VerificacionService } from '../../services/verificacion.service';
 import { ResultadoFiscalizacion } from '../../models/solicitud.model';
 import { todayPeru } from '../../core/date';
+import {UsuariosService} from '../../services/usuarios.service';
 import { formatTimeDual } from '../../core/time';
 
 type Coordenadas = [number, number];
@@ -37,6 +38,7 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   gpsCargando = false;
   guardando = false;
   descargando = false;
+  jornadaHtmlHabilitada = true;
   error = '';
   gpsMensaje = '';
   reporte: File | null = null;
@@ -54,6 +56,7 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
     private router: Router,
     private route: ActivatedRoute,
     private cdr: ChangeDetectorRef,
+    private usuarios: UsuariosService,
   ) {}
 
   get sesion() { return this.auth.session; }
@@ -69,6 +72,7 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   cerrarSesion(): void { this.auth.logout(); void this.router.navigate(['/login']); }
 
   async ngOnInit(): Promise<void> {
+    try{this.jornadaHtmlHabilitada=(await this.usuarios.misPreferencias()).descargarJornadaHtml;}catch{this.jornadaHtmlHabilitada=false;}
     this.actualizarVista(this.router.url);
     this.navigationSubscription = this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(e => {
       this.actualizarVista((e as NavigationEnd).urlAfterRedirects);

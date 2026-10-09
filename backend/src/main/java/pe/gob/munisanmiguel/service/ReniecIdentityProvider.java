@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import pe.gob.munisanmiguel.dto.ApiDtos.ReniecResponse;
 import pe.gob.munisanmiguel.exception.NotFoundException;
@@ -16,7 +15,6 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 
-@Component
 public class ReniecIdentityProvider implements IdentityProvider {
     private final RestClient client;
     private final ObjectMapper mapper;

@@ -16,12 +16,32 @@ import java.util.List;
 @RestController @RequestMapping("/api/expedientes")
 public class FiscalizacionAltaController {
     private final AltaFiscalizacionService service;
-    public FiscalizacionAltaController(AltaFiscalizacionService service){this.service=service;}
+    private final pe.gob.munisanmiguel.service.AdminSettingsService settings;
+    public FiscalizacionAltaController(AltaFiscalizacionService service,pe.gob.munisanmiguel.service.AdminSettingsService settings){this.service=service;this.settings=settings;}
 
     @PostMapping(value="/fiscalizaciones",consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('EXPEDIENTE_CREAR')")
     public ResponseEntity<ExpedienteResponse> crear(@Valid @RequestPart("fiscalizacion") CrearFiscalizacionRequest request,
             @RequestPart(value="documentos",required=false) List<MultipartFile> documentos,Authentication auth){
+        if(request.metodoUbicacion()!=null){
+            if(request.expediente().latitud()==null||request.expediente().longitud()==null)
+                throw new IllegalArgumentException("Indica coordenadas válidas para el predio.");
+            var preferences=settings.forUser(auth.getName());
+            boolean enabled=switch(request.metodoUbicacion()){
+                case "MAPA_INTERNO" -> preferences.mapaInterno();
+                case "GOOGLE_EXTERNO" -> preferences.googleExterno();
+                case "GOOGLE_URL" -> preferences.googleUrl();
+                case "SOLICITUD_EXISTENTE" -> request.expediente().solicitudCodigo()!=null;
+                default -> false;
+            };
+            if(!enabled)throw new AccessDeniedException("El método de ubicación está desactivado para tu cuenta.");
+            if(request.metodoUbicacion().startsWith("GOOGLE")){
+                var point=pe.gob.munisanmiguel.service.GoogleMapsCoordinates.extract(request.enlaceGoogle());
+                if(point==null||request.expediente().latitud()==null||request.expediente().longitud()==null||
+                        point[0].compareTo(request.expediente().latitud())!=0||point[1].compareTo(request.expediente().longitud())!=0)
+                    throw new IllegalArgumentException("El enlace de Google Maps no corresponde a las coordenadas confirmadas.");
+            }
+        }
         if(request.primeraProgramacion()!=null&&(!has(auth,"PROGRAMACION_CREAR")||!has(auth,"FISCALIZADOR_ASIGNAR")))
             throw new AccessDeniedException("No tienes permisos para programar y asignar fiscalizadores.");
         if(documentos!=null&&!documentos.isEmpty()&&!has(auth,"EXPEDIENTE_EDITAR"))

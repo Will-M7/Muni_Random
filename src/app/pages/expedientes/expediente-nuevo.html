@@ -36,7 +36,7 @@
       </div>
       <label class="check-row"><input type="checkbox" [(ngModel)]="administradoAplica" name="administradoAplica"> Hay administrado identificado</label>
       <div class="form-grid admin-grid" *ngIf="administradoAplica">
-        <div class="dni-group"><label>DNI <span class="required-mark">*</span><input [(ngModel)]="dni" name="dni" required maxlength="8" inputmode="numeric"></label><div class="inline-field"><button class="btn-light reniec-button" type="button" (click)="consultarDni()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg>Consultar RENIEC</button><small>{{reniecMensaje}}</small></div></div>
+        <div class="dni-group"><label>DNI <span class="required-mark">*</span><input [(ngModel)]="dni" (ngModelChange)="dniActualizado()" name="dni" required maxlength="8" inputmode="numeric"></label><div class="inline-field"><small>{{reniecMensaje||(!dniDisponible?'Ingreso manual disponible.':'La consulta se hará al completar 8 dígitos.')}}</small></div></div>
         <label>Nombres <span class="required-mark">*</span><input [(ngModel)]="nombres" (ngModelChange)="actualizarPopupPreview()" name="nombres" required></label>
         <label>Apellidos <span class="required-mark">*</span><input [(ngModel)]="apellidos" (ngModelChange)="actualizarPopupPreview()" name="apellidos" required></label>
         <label>Teléfono<input [(ngModel)]="telefono" (ngModelChange)="actualizarPopupPreview()" name="telefono" type="tel"></label>
@@ -47,13 +47,18 @@
     <section class="panel form-section">
       <div class="form-section-heading">
         <span class="form-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
-        <div><h2>Ubicación del predio</h2><p>{{ubicacionConfirmada?('Coordenadas del predio: '+latitud+', '+longitud):'La dirección se busca automáticamente y aparece con un pin rojo en el mapa.'}}</p></div>
+        <div><h2>Ubicación del predio</h2><p>{{ubicacionConfirmada?('Coordenadas confirmadas: '+latitud+', '+longitud):'Selecciona un punto exacto del predio.'}}</p></div>
       </div>
       <div class="location-box location-preview-heading">
         <p class="hint" role="status">{{autoUbicacionBuscando?'Buscando la dirección…':(autoUbicacionMensaje||'Escribe el jirón y número para ubicar automáticamente la casa.')}}</p>
-        <button type="button" class="btn-light" (click)="seleccionarUbicacion()">Ajustar punto en el mapa</button>
+        <button *ngIf="preferencias.mapaInterno" type="button" class="btn-light" (click)="seleccionarUbicacion()">{{ubicacionConfirmada?'Ajustar ubicación en mapa':'Seleccionar en mapa interno'}}</button>
+        <button *ngIf="preferencias.googleExterno" type="button" class="btn-light" (click)="abrirGoogle()">Abrir Google Maps y recuperar enlace</button>
+        <button *ngIf="ubicacionConfirmada" type="button" class="btn-light" (click)="ajustarUbicacion()">Ajustar ubicación</button>
       </div>
-      <div #locationPreview class="location-preview-map" aria-label="Vista previa del domicilio en el mapa"></div>
+      <div *ngIf="preferencias.googleUrl&&!ubicacionConfirmada" class="google-paste"><label>URL compartida de Google Maps<input [(ngModel)]="googleLink" name="googleLink" type="url" placeholder="https://www.google.com/maps/place/..."></label><button type="button" class="btn-light" (click)="confirmarGoogle()">Confirmar punto del enlace</button></div>
+      <p class="error" *ngIf="googleError" role="alert">{{googleError}}</p>
+      <div *ngIf="ubicacionConfirmada" #locationPreview class="location-preview-map" aria-label="Vista previa del domicilio en el mapa"></div>
+      <div *ngIf="googleModal" class="google-modal-backdrop"><section class="google-modal" role="dialog" aria-modal="true" aria-label="Recuperar ubicación de Google Maps"><h3>Recuperar punto de Google Maps</h3><p>En Google Maps selecciona el marcador del predio y usa Compartir. Luego pega el enlace. Los clics en esa pestaña no se pueden leer aquí.</p><label>Enlace compartido<input [(ngModel)]="googleLink" name="googleModalLink" type="url"></label><p class="error" *ngIf="googleError">{{googleError}}</p><div><button type="button" class="btn-light" (click)="leerPortapapeles()">Leer portapapeles</button><button type="button" class="btn-light" (click)="confirmarGoogle()">Confirmar enlace</button><button type="button" class="btn-light" (click)="googleModal=false">Cerrar</button></div></section></div>
     </section>
 
     <section class="panel form-section">
@@ -74,7 +79,7 @@
         <label>Fecha operativa<input type="date" [(ngModel)]="fecha" name="fecha" (change)="cargarAgenda()" required></label>
         <label>Hora operativa (24 h)<input type="time" min="00:00" max="23:59" step="60" [(ngModel)]="hora" name="hora" required><small>{{horaDual(hora)}}</small></label>
         <label>Fiscalizador activo<select [(ngModel)]="fiscalizadorId" name="fiscalizador"><option value="">Seleccionar fiscalizador</option><option *ngFor="let f of fiscalizadores" [value]="f.id">{{f.nombre}}</option></select></label>
-        <div class="wide" *ngIf="fecha"><p>Agenda del {{fecha}}</p><p *ngIf="agendaError" role="alert">{{agendaError}}</p><p *ngIf="!agendaError&&!agenda.length">Sin visitas registradas para esta fecha.</p><div *ngFor="let f of fiscalizadores"><small>{{f.nombre}}: {{totalFiscalizador(f.id)}} visita(s)</small></div><table *ngIf="agenda.length"><thead><tr><th>Fiscalizador</th><th>Hora</th><th>Expediente</th><th>Estado</th></tr></thead><tbody><tr *ngFor="let v of agenda"><td>{{v.fiscalizadorNombre}}</td><td>{{horaDual(v.hora)}}</td><td>{{v.expedienteCodigo}}</td><td>{{v.estado}}<span *ngIf="conflicto(v)"> · Conflicto horario</span></td></tr></tbody></table></div>
+        <div class="wide" *ngIf="fecha"><p>Agenda del {{fecha}} · Carga válida: {{cargaValida}} / {{limiteDiario}}</p><p class="error" *ngIf="cargaValida+1>limiteDiario">Esta visita superaría el límite orientativo. Puedes continuar después de confirmar.</p><p *ngIf="agendaError" role="alert">{{agendaError}}</p><p *ngIf="!agendaError&&!agenda.length">Sin visitas registradas para esta fecha.</p><div *ngFor="let f of fiscalizadores"><small>{{f.nombre}}: {{totalFiscalizador(f.id)}} visita(s)</small></div><table *ngIf="agenda.length"><thead><tr><th>Fiscalizador</th><th>Hora</th><th>Expediente</th><th>Estado</th></tr></thead><tbody><tr *ngFor="let v of agenda"><td>{{v.fiscalizadorNombre}}</td><td>{{horaDual(v.hora)}}</td><td>{{v.expedienteCodigo}}</td><td>{{v.estado}}<span *ngIf="conflicto(v)"> · Conflicto horario</span></td></tr></tbody></table></div>
       </div>
     </section>
     <div class="form-actions"><a class="btn-light" routerLink="/expedientes">Cancelar</a><button type="submit" class="btn-primary" [disabled]="guardando">{{guardando?'Guardando…':'Crear fiscalización'}}</button></div>

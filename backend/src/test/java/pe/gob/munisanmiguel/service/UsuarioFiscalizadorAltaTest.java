@@ -13,6 +13,23 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class UsuarioFiscalizadorAltaTest {
+    @Test void impideDesactivarUltimoAdministradorActivo(){
+        var users=mock(AppUserRepository.class);var admin=new AppUser();admin.setId(1L);admin.setUsername("admin");admin.setActivo(true);
+        var role=new AppRole();role.setName("ADMIN_SISTEMA");admin.getRoles().add(role);
+        when(users.findByUsernameIgnoreCase("admin")).thenReturn(Optional.of(admin));
+        when(users.activeAdminsForUpdate()).thenReturn(List.of(admin));
+        var service=new UsuarioService(users,mock(PasswordEncoder.class),mock(AppRoleRepository.class),mock(FiscalizadorRepository.class),mock(AdminSettingsService.class));
+        assertThrows(ConflictException.class,()->service.cambiarEstado("admin",false));
+        assertTrue(admin.isActivo());
+    }
+    @Test void permiteCrearMunicipioSinConfirmarPassword(){
+        var users=mock(AppUserRepository.class);var roles=mock(AppRoleRepository.class);var encoder=mock(PasswordEncoder.class);var settings=mock(AdminSettingsService.class);
+        var role=new AppRole();role.setName("MUNICIPIO");when(roles.findByName("MUNICIPIO")).thenReturn(Optional.of(role));
+        when(users.saveAndFlush(any())).thenAnswer(i->{AppUser u=i.getArgument(0);u.setId(12L);return u;});
+        var service=new UsuarioService(users,encoder,roles,mock(FiscalizadorRepository.class),settings);
+        service.crear(new UsuarioRequest("muni-nuevo","Municipio nuevo","12345678",null,Rol.MUNICIPIO,null));
+        verify(settings).createDefaults(any(AppUser.class));
+    }
     @Test void crearCuentaFiscalizadorVinculaIdentidadOperativa(){
         var users=mock(AppUserRepository.class);var roles=mock(AppRoleRepository.class);
         var fiscalizadores=mock(FiscalizadorRepository.class);var encoder=mock(PasswordEncoder.class);
@@ -21,7 +38,7 @@ class UsuarioFiscalizadorAltaTest {
         when(users.findByUsernameIgnoreCase("inspector")).thenReturn(Optional.empty());
         when(users.saveAndFlush(any())).thenAnswer(i->{AppUser u=i.getArgument(0);u.setId(42L);return u;});
         when(fiscalizadores.save(any())).thenAnswer(i->i.getArgument(0));
-        var service=new UsuarioService(users,encoder,roles,fiscalizadores);
+        var service=new UsuarioService(users,encoder,roles,fiscalizadores,mock(AdminSettingsService.class));
         service.crear(new UsuarioRequest("inspector","Inspector de prueba","12345678","12345678",Rol.FISCALIZADOR,null));
         verify(fiscalizadores).save(argThat(f->"F-U-16".equals(f.getId())&&f.isActivo()));
         verify(users).saveAndFlush(argThat(u->u.getFiscalizador()!=null||u.getId()==42L));
@@ -35,7 +52,7 @@ class UsuarioFiscalizadorAltaTest {
         var role=new AppRole();role.setName("FISCALIZADOR");
         when(users.findByUsernameIgnoreCase("existente")).thenReturn(Optional.of(user));
         when(roles.findAll()).thenReturn(List.of(role));
-        new UsuarioService(users,mock(PasswordEncoder.class),roles,fiscalizadores).asignarRoles("existente",List.of("FISCALIZADOR"),null);
+        new UsuarioService(users,mock(PasswordEncoder.class),roles,fiscalizadores,mock(AdminSettingsService.class)).asignarRoles("existente",List.of("FISCALIZADOR"),null);
         assertSame(fiscalizador,user.getFiscalizador());verifyNoInteractions(fiscalizadores);
     }
 
@@ -47,7 +64,7 @@ class UsuarioFiscalizadorAltaTest {
         when(roles.findByName("FISCALIZADOR")).thenReturn(Optional.of(role));
         when(users.saveAndFlush(any())).thenAnswer(i->{AppUser u=i.getArgument(0);u.setId(43L);return u;});
         when(fiscalizadores.findById("FIS-001")).thenReturn(Optional.of(existing));
-        new UsuarioService(users,encoder,roles,fiscalizadores).crear(
+        new UsuarioService(users,encoder,roles,fiscalizadores,mock(AdminSettingsService.class)).crear(
                 new UsuarioRequest("inspector2","Inspector dos","12345678","12345678",Rol.FISCALIZADOR,"FIS-001"));
         verify(fiscalizadores,never()).save(any());
         verify(users).saveAndFlush(argThat(u->u.getFiscalizador()==existing));
@@ -61,7 +78,7 @@ class UsuarioFiscalizadorAltaTest {
         when(roles.findByName("FISCALIZADOR")).thenReturn(Optional.of(role));
         when(users.saveAndFlush(any())).thenAnswer(i->{AppUser u=i.getArgument(0);u.setId(44L);return u;});
         when(fiscalizadores.findAll()).thenReturn(List.of(existing));
-        var service=new UsuarioService(users,mock(PasswordEncoder.class),roles,fiscalizadores);
+        var service=new UsuarioService(users,mock(PasswordEncoder.class),roles,fiscalizadores,mock(AdminSettingsService.class));
         assertThrows(ConflictException.class,()->service.crear(
                 new UsuarioRequest("inspector3","Inspector de prueba","12345678","12345678",Rol.FISCALIZADOR,null)));
         verify(fiscalizadores,never()).save(any());

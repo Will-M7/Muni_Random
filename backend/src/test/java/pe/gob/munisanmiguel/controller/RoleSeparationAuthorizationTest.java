@@ -29,6 +29,7 @@ class RoleSeparationAuthorizationTest {
     @MockitoBean UsuarioService usuarios;
     @MockitoBean RoleCapabilityService roleCapabilities;
     @MockitoBean JwtService jwtService;
+    @MockitoBean pe.gob.munisanmiguel.service.AdminSettingsService settings;
     @MockitoBean AppUserRepository userRepository;
 
     @Test @WithMockUser(authorities = {"USUARIOS_VER", "USUARIOS_CREAR"})

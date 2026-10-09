@@ -6,6 +6,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -30,7 +31,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler({IllegalArgumentException.class, MethodArgumentNotValidException.class, HttpMessageNotReadableException.class}) ResponseEntity<ErrorResponse> bad(Exception e, HttpServletRequest r) {
         String message = e instanceof MethodArgumentNotValidException m
                 ? m.getBindingResult().getFieldErrors().stream().map(x -> x.getField()+": "+x.getDefaultMessage()).collect(Collectors.joining("; "))
-                : e instanceof IllegalArgumentException i && i.getMessage() != null && i.getMessage().startsWith("El DNI")
+                : e instanceof IllegalArgumentException i && i.getMessage() != null && java.util.List.of("El DNI","Mantén al menos","El límite debe","Endpoint RENIEC","El enlace","Usa un enlace","Indica coordenadas","El método de ubicación").stream().anyMatch(i.getMessage()::startsWith)
                     ? i.getMessage()
                     : "Solicitud inválida.";
         return response(HttpStatus.BAD_REQUEST, message == null ? "Solicitud inválida." : message, r);
@@ -39,6 +40,7 @@ public class ApiExceptionHandler {
         return response(HttpStatus.BAD_REQUEST, "Parámetro de consulta inválido o faltante.", r);
     }
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class) ResponseEntity<ErrorResponse> unsupported(HttpMediaTypeNotSupportedException e, HttpServletRequest r) { return response(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Content-Type no soportado.", r); }
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class) ResponseEntity<ErrorResponse> notAcceptable(HttpMediaTypeNotAcceptableException e,HttpServletRequest r){return response(HttpStatus.NOT_ACCEPTABLE,"Formato de respuesta no disponible.",r);}
     @ExceptionHandler(MaxUploadSizeExceededException.class) ResponseEntity<ErrorResponse> tooLarge(MaxUploadSizeExceededException e, HttpServletRequest r) { return response(HttpStatus.PAYLOAD_TOO_LARGE, "El documento supera el tamaño máximo permitido.", r); }
     @ExceptionHandler(MissingServletRequestPartException.class) ResponseEntity<ErrorResponse> missingPart(MissingServletRequestPartException e, HttpServletRequest r) { return response(HttpStatus.BAD_REQUEST, "Debe adjuntar el documento PDF.", r); }
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class) ResponseEntity<ErrorResponse> methodNotAllowed(HttpRequestMethodNotSupportedException e, HttpServletRequest r) { return response(HttpStatus.METHOD_NOT_ALLOWED, "Método HTTP no permitido para este recurso.", r); }

@@ -5,3 +5,4 @@
 .conclusion-form .field-hint{grid-column:1/-1}
 .conclusion-form .check .field-hint{flex-basis:100%}
 @media(max-width:480px){.inline-actions{width:100%}.inline-actions button{flex:1}}
+.daily-summary{margin:22px 0;padding:20px;background:#fff;border:1px solid #e0e9e5;border-radius:16px}.daily-summary h2{margin:0 0 5px;font-size:20px}.daily-summary p{color:#63766d}.daily-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}.daily-card{display:grid;gap:5px;text-align:left;padding:16px;border:1px solid #dce9e2;border-left:5px solid #20945e;border-radius:12px;background:#f7fcf9;color:#20382d;cursor:pointer}.daily-card.yellow{border-left-color:#d39b22;background:#fffaf0}.daily-card.red{border-left-color:#c84242;background:#fff5f4}.daily-card.selected{outline:2px solid #246b50}.daily-card small{line-height:1.5;color:#53675d}
