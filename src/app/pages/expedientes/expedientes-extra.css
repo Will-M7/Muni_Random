@@ -1,9 +1,4 @@
 .location-actions{display:flex;flex-wrap:wrap;gap:8px}
-.location-dialog{width:min(540px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;box-sizing:border-box;padding:20px}
-.location-dialog[open]{display:grid;gap:12px}
-.location-dialog label{display:grid;gap:6px}
-.location-dialog input{width:100%;box-sizing:border-box}
-.location-dialog div{display:grid;gap:10px}
 
 /* Formulario de alta de expedientes */
 .form-page{padding:24px clamp(20px,3.4vw,58px) 64px;background-size:100% auto;background-attachment:scroll}
@@ -40,6 +35,10 @@
 .location-actions{display:flex;flex-wrap:wrap;gap:10px}
 .form-page .hint{margin:0;color:#6b7c91;font-size:12px;line-height:1.5}
 .location-box>.hint{max-width:520px}
+.location-preview-heading{align-items:center;margin-bottom:12px}
+.location-preview-heading .hint{flex:1}
+.location-preview-map{height:230px;min-height:190px;overflow:hidden;border:1px solid #cbded3;border-radius:12px;background:#e8ede9;box-shadow:0 4px 14px rgba(20,64,42,.08)}
+.location-preview-pin{background:transparent;border:0}
 .form-page .file-label{max-width:540px}
 .form-page input[type=file]{width:100%;padding:11px;border:1px dashed #b8ccc1;border-radius:9px;background:#f8fbf9;color:#415b4e;font-size:13px}
 .file-name{display:block;margin:8px 0 0 2px;color:#64758a;font-size:12px}
@@ -58,5 +57,5 @@
 .form-actions .btn-primary{border:1px solid #087052;background:#087052;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(8,112,82,.16)}
 .form-actions .btn-primary:hover:not(:disabled){background:#056248}.form-actions .btn-primary:disabled{opacity:.6;cursor:wait}
 @media(max-width:1050px){.origin-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.schedule-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.dni-group{grid-column:span 2}}
-@media(max-width:680px){.form-page{padding:18px 15px 40px}.form-page>.back{margin-bottom:18px}.form-page>.page-head{margin-bottom:19px}.form-page>.page-head h1{font-size:34px}.form-page>.page-head p:not(.eyebrow){font-size:15px}.expediente-form{gap:11px}.form-page .form-section{padding:15px}.form-section-heading{gap:11px;margin-bottom:13px}.form-section-icon{width:44px;height:44px}.form-section-icon svg{width:22px;height:22px}.form-page .form-section h2{font-size:20px}.form-section-heading p{font-size:12px!important}.origin-grid,.admin-grid,.schedule-fields{grid-template-columns:1fr}.dni-group{grid-column:auto;grid-template-columns:minmax(110px,.8fr) minmax(145px,1fr);gap:9px}.expediente-form label{font-size:13px}.location-box{align-items:flex-start;flex-direction:column}.location-actions{width:100%}.location-actions .btn-light{flex:1}.schedule-fields .wide{grid-column:auto}.form-actions{justify-content:stretch}.form-actions>*{flex:1;text-align:center}}
+@media(max-width:680px){.form-page{padding:18px 15px 40px}.form-page>.back{margin-bottom:18px}.form-page>.page-head{margin-bottom:19px}.form-page>.page-head h1{font-size:34px}.form-page>.page-head p:not(.eyebrow){font-size:15px}.expediente-form{gap:11px}.form-page .form-section{padding:15px}.form-section-heading{gap:11px;margin-bottom:13px}.form-section-icon{width:44px;height:44px}.form-section-icon svg{width:22px;height:22px}.form-page .form-section h2{font-size:20px}.form-section-heading p{font-size:12px!important}.origin-grid,.admin-grid,.schedule-fields{grid-template-columns:1fr}.dni-group{grid-column:auto;grid-template-columns:minmax(110px,.8fr) minmax(145px,1fr);gap:9px}.expediente-form label{font-size:13px}.location-box{align-items:flex-start;flex-direction:column}.location-actions{width:100%}.location-actions .btn-light{flex:1}.location-preview-heading{gap:10px}.location-preview-heading .btn-light{width:100%}.location-preview-map{height:220px}.schedule-fields .wide{grid-column:auto}.form-actions{justify-content:stretch}.form-actions>*{flex:1;text-align:center}}
 @media(max-width:390px){.dni-group{grid-template-columns:1fr}.inline-field{align-content:start}.location-actions{flex-direction:column}.location-actions .btn-light{width:100%}}

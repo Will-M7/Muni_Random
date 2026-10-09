@@ -63,6 +63,7 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   get noRealizadas() { return this.tareasDia.filter(t => t.resultado === 'NO_REALIZADA'); }
   get puntosRuta():TareaConCoordenadas[] { return this.pendientes.filter((t):t is TareaConCoordenadas=>this.coordenadasValidas(t)); }
   get sinCoordenadas():FiscalizadorTarea[]{return this.pendientes.filter(t=>!this.coordenadasValidas(t));}
+  get puntosMapa():TareaConCoordenadas[]{const unicos=new Map<string,TareaConCoordenadas>();for(const tarea of [...this.tareasDia,...this.proximas])if(this.coordenadasValidas(tarea))unicos.set(`${tarea.codigo}-${tarea.fecha}-${tarea.hora}`,tarea);return[...unicos.values()];}
   get distanciaRutaKm() { return this.calcularRuta().distanciaKm; }
   get rutaOrdenada() { return this.calcularRuta().orden; }
   cerrarSesion(): void { this.auth.logout(); void this.router.navigate(['/login']); }
@@ -160,7 +161,7 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
     finally { this.guardando = false; this.cdr.markForCheck(); }
   }
 
-  verEnMapa(tarea: FiscalizadorTarea): void { if(!this.coordenadasValidas(tarea)){this.gpsMensaje='Esta visita no tiene coordenadas válidas; consulta la dirección disponible.';this.cdr.markForCheck();return;}this.seleccionada = tarea; const point:Coordenadas=[tarea.latitud,tarea.longitud];setTimeout(() => { this.actualizarMapa(); this.mapa?.setView(point, 16); }); }
+  verEnMapa(tarea: FiscalizadorTarea): void { if(!this.coordenadasValidas(tarea)){this.gpsMensaje='Esta visita no tiene coordenadas válidas; consulta la dirección disponible.';this.cdr.markForCheck();return;}this.seleccionada = tarea; const point:Coordenadas=[tarea.latitud,tarea.longitud];setTimeout(() => { this.actualizarMapa(); this.mapa?.setView(point, 16); this.abrirPopupTarea(tarea); }); }
   abrirGoogleMaps(tarea: FiscalizadorTarea): void { if(!this.coordenadasValidas(tarea)||!this.ubicacionActual){this.abrirDomicilio(tarea);return;}const origen=this.ubicacionActual;const url=`https://www.google.com/maps/dir/?api=1&origin=${origen[0]},${origen[1]}&destination=${tarea.latitud},${tarea.longitud}&travelmode=driving`;window.open(url,'_blank','noopener'); }
   abrirDomicilio(tarea: FiscalizadorTarea): void { const destino=this.coordenadasValidas(tarea)?`${tarea.latitud},${tarea.longitud}`:tarea.direccion;if(!destino){this.gpsMensaje='Esta visita no tiene ubicación suficiente.';this.cdr.markForCheck();return;}window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destino)}`, '_blank', 'noopener'); }
   abrirRecorridoCompleto(): void { const orden=this.rutaOrdenada;if(!orden.length)return;if(orden.length===1&&!this.ubicacionActual){this.abrirDomicilio(orden[0]);return;}const origen=this.ubicacionActual||[orden[0].latitud,orden[0].longitud];const stops=this.ubicacionActual?orden:orden.slice(1);const destino=stops.at(-1)!;const waypoints=stops.slice(0,-1).map(t=>`${t.latitud},${t.longitud}`).join('|');const url=`https://www.google.com/maps/dir/?api=1&origin=${origen[0]},${origen[1]}&destination=${destino.latitud},${destino.longitud}${waypoints?`&waypoints=${encodeURIComponent(waypoints)}`:''}&travelmode=driving`;window.open(url,'_blank','noopener'); }
@@ -175,19 +176,29 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
     return { orden, distanciaKm: Number(distancia.toFixed(2)) };
   }
   private distancia(a: Coordenadas, b: Coordenadas): number { const r = 6371; const dLat = (b[0] - a[0]) * Math.PI / 180; const dLon = (b[1] - a[1]) * Math.PI / 180; const x = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.sin(dLon / 2) ** 2; return r * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)); }
-  private coordenadasValidas(t:FiscalizadorTarea):t is TareaConCoordenadas{return t.latitud!==null&&t.longitud!==null&&Number.isFinite(t.latitud)&&Number.isFinite(t.longitud)&&Math.abs(t.latitud)<=90&&Math.abs(t.longitud)<=180;}
+  private coordenadasValidas(t:FiscalizadorTarea):t is TareaConCoordenadas{return t.latitud!==null&&t.longitud!==null&&Number.isFinite(t.latitud)&&Number.isFinite(t.longitud)&&t.latitud!==0&&t.longitud!==0&&Math.abs(t.latitud)<=90&&Math.abs(t.longitud)<=180;}
 
   private actualizarMapa(): void {
     if (!this.routeMap?.nativeElement) return;
-    const centro = this.ubicacionActual || (this.puntosRuta.length ? [this.puntosRuta[0].latitud, this.puntosRuta[0].longitud] as Coordenadas : null);
+    const centro = this.ubicacionActual || (this.puntosMapa.length ? [this.puntosMapa[0].latitud, this.puntosMapa[0].longitud] as Coordenadas : null);
     if (!centro) return;
     if (!this.mapa) { this.mapa = L.map(this.routeMap.nativeElement).setView(centro, 14); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(this.mapa); }
     this.mapa.eachLayer(layer => { if (layer instanceof L.Marker) this.mapa?.removeLayer(layer); });
     const markers: L.LatLngExpression[] = [];
     if (this.ubicacionActual) { L.marker(this.ubicacionActual, { icon: L.divIcon({ className: 'route-marker current-marker', html: '<span>0</span>', iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(this.mapa).bindPopup('Ubicación actual'); markers.push(this.ubicacionActual); }
-    this.puntosRuta.forEach((tarea, index) => { const point: L.LatLngExpression = [tarea.latitud, tarea.longitud]; const popup=document.createElement('div');const summary=document.createElement('strong');summary.textContent=`${tarea.hora.slice(0,5)} · ${tarea.codigo}`;const detail=document.createElement('p');detail.textContent=`${tarea.ciudadano} · ${tarea.direccion||'Sin dirección'}`;const link=document.createElement('a');link.href=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${tarea.latitud},${tarea.longitud}`)}`;link.target='_blank';link.rel='noopener';link.textContent='Navegar con Google Maps';popup.append(summary,detail,link);L.marker(point, { icon: L.divIcon({ className: 'route-marker', html: `<span>${index + 1}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(this.mapa!).bindPopup(popup); markers.push(point); });
+    this.puntosMapa.forEach((tarea, index) => { const point: L.LatLngExpression = [tarea.latitud, tarea.longitud]; const popup=document.createElement('div');const summary=document.createElement('strong');summary.textContent=`${tarea.ciudadano} · ${tarea.codigo}`;const detail=document.createElement('p');detail.textContent=`${tarea.direccion||'Sin dirección'} · ${tarea.fecha} ${tarea.hora.slice(0,5)}`;popup.append(summary,detail);if(tarea.telefono){const phone=document.createElement('p');phone.textContent=`Teléfono: ${tarea.telefono}`;popup.append(phone);}const link=document.createElement('a');link.href=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${tarea.latitud},${tarea.longitud}`)}`;link.target='_blank';link.rel='noopener';link.textContent='Navegar con Google Maps';popup.append(link);const html=`<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44" aria-hidden="true"><path fill="#dc2626" stroke="#fff" stroke-width="2" d="M18 2C9.2 2 2 9.2 2 18c0 10.4 16 24 16 24s16-13.6 16-24C34 9.2 26.8 2 18 2Z"/><circle cx="18" cy="18" r="8" fill="#fff"/><text x="18" y="22" text-anchor="middle" fill="#dc2626" font-size="11" font-family="Arial" font-weight="700">${index+1}</text></svg>`;L.marker(point,{icon:L.divIcon({className:'route-marker red-pin',html,iconSize:[36,44],iconAnchor:[18,43],popupAnchor:[0,-39]})}).addTo(this.mapa!).bindPopup(popup);markers.push(point); });
     if (markers.length > 1) this.mapa.fitBounds(L.latLngBounds(markers), { padding: [20, 20], maxZoom: 16 });
+    else if(markers.length===1)this.mapa.setView(markers[0],15);
     this.mapa.invalidateSize({ pan: false });
+  }
+
+  private abrirPopupTarea(tarea: TareaConCoordenadas): void {
+    this.mapa?.eachLayer(layer => {
+      if (!(layer instanceof L.Marker) || !layer.getPopup()) return;
+      const contenido = layer.getPopup()?.getContent();
+      const punto = layer.getLatLng();
+      if (contenido instanceof HTMLElement && contenido.textContent?.includes(tarea.codigo) && punto.lat === tarea.latitud && punto.lng === tarea.longitud) layer.openPopup();
+    });
   }
 
   async abrirDocumento(): Promise<void> { if (!this.seleccionada) return; const blob = await this.service.abrirDocumentoTarea(this.seleccionada.codigo); this.abrirBlob(blob); }

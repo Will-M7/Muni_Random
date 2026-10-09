@@ -167,7 +167,7 @@
 
   <!-- LISTA DE EXPEDIENTES (TARJETAS MODERNAS) -->
   <section class="cases-container" *ngIf="!cargando">
-    <a class="case-card" *ngFor="let e of filtrados" [routerLink]="['/expedientes', e.codigo]">
+    <article class="case-card" *ngFor="let e of filtrados" [class.expanded]="expandido===e.codigo">
 
       <!-- ICONO IZQUIERDO -->
       <div class="card-icon-badge">
@@ -222,7 +222,7 @@
             <line x1="8" y1="2" x2="8" y2="6"/>
             <line x1="3" y1="10" x2="21" y2="10"/>
           </svg>
-          <span>{{ vigente(e)?.fecha ? (vigente(e)?.fecha | date:'dd/MM/yyyy') : 'Sin fecha' }} {{ vigente(e)?.hora || '' }}</span>
+          <span>{{ vigente(e)?.fecha ? (vigente(e)?.fecha | date:'dd/MM/yyyy':'UTC') : 'Sin fecha' }} {{ vigente(e)?.hora || '' }}</span>
         </div>
         <div class="meta-row">
           <svg viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.8" class="meta-icon">
@@ -241,13 +241,33 @@
       </div>
 
       <!-- BOTÓN FLECHA DERECHA CIRCULAR -->
-      <div class="card-action-circle">
+      <button type="button" class="card-action-circle" [attr.aria-expanded]="expandido===e.codigo" [attr.aria-controls]="expandido===e.codigo?'expediente-extra-'+e.codigo:null" [attr.aria-label]="(expandido===e.codigo?'Ocultar':'Mostrar')+' detalles de '+administrado(e)" (click)="toggleExpediente(e.codigo)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <polyline points="9 18 15 12 9 6"/>
         </svg>
+      </button>
+
+      <div class="case-expanded" *ngIf="expandido===e.codigo" [id]="'expediente-extra-'+e.codigo">
+        <div class="expanded-person">
+          <span class="expanded-label">Administrado</span>
+          <strong>{{ administrado(e) }}</strong>
+          <span>{{ e.direccionFiscalizada || 'Sin dirección registrada' }}<small *ngIf="e.referenciaDomicilio"> · {{ e.referenciaDomicilio }}</small></span>
+        </div>
+        <div class="expanded-appointment">
+          <span class="expanded-label">Cita / visita</span>
+          <strong>{{ vigente(e)?.fecha ? (vigente(e)?.fecha | date:'dd/MM/yyyy':'UTC') : 'Sin cita programada' }}</strong>
+          <span *ngIf="vigente(e)?.hora">{{ vigente(e)?.hora }} · {{ vigente(e)?.estado }}</span>
+          <span *ngIf="!vigente(e)?.hora">{{ vigente(e)?.estado || 'Pendiente de programación' }}</span>
+        </div>
+        <div class="expanded-assignment">
+          <span class="expanded-label">Fiscalizador asignado</span>
+          <strong>{{ vigente(e)?.fiscalizadorNombre || 'Sin fiscalizador' }}</strong>
+          <span>{{ origenNombre(e.origen) }} · Creado {{ e.fechaCreacion | date:'dd/MM/yyyy' }}</span>
+        </div>
+        <a class="expanded-link" [routerLink]="['/expedientes',e.codigo]">Ver expediente <span aria-hidden="true">→</span></a>
       </div>
 
-    </a>
+    </article>
 
     <!-- MENSAJE VACÍO -->
     <div class="empty-state-box" *ngIf="!filtrados.length">

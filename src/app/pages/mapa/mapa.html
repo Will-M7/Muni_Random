@@ -28,7 +28,7 @@
             <input id="map-search-input" [(ngModel)]="terminoBusqueda" name="terminoBusqueda" placeholder="Ej. Jr. Tumbes, San Miguel - San Román, Puno" />
             <button type="submit" [disabled]="buscando">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg>
-              {{ buscando ? 'Buscando...' : 'Buscar' }}
+              {{ buscando ? 'Buscando…' : 'Buscar' }}
             </button>
           </div>
         </form>
@@ -49,6 +49,38 @@
       <span class="selection-status" [class.active]="coordenadasSeleccionadas">{{ coordenadasSeleccionadas ? 'Punto seleccionado' : 'Esperando selección' }}</span>
     </div>
 
-    <div class="map-wrapper"><div id="mapa"></div></div>
+    <div class="map-workspace">
+      <div class="map-wrapper"><div id="mapa"></div></div>
+      <aside class="solicitudes-panel" aria-label="Solicitudes ubicadas en el mapa">
+        <header class="solicitudes-head">
+          <div><span class="eyebrow">PERSONAS REGISTRADAS</span><h2>Solicitudes en el mapa</h2></div>
+          <span class="solicitudes-count">{{ solicitudesFiltradas.length }}</span>
+        </header>
+        <p class="solicitudes-error" *ngIf="solicitudesError" role="status">{{ solicitudesError }}</p>
+        <div class="solicitudes-list" *ngIf="solicitudesFiltradas.length; else solicitudesVacias">
+          <article class="solicitud-ubicacion" *ngFor="let s of solicitudesFiltradas" [class.expanded]="solicitudExpandida===s.codigo">
+            <div class="solicitud-resumen">
+              <button type="button" class="solicitud-focus" (click)="enfocarSolicitud(s)" [disabled]="!tieneCoordenadas(s)" [attr.aria-label]="'Mostrar en el mapa: '+s.nombre">
+                <span class="solicitud-pin" [class.pending]="!tieneCoordenadas(s)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+                <span class="solicitud-identidad"><strong>{{ s.nombre }}</strong><small>{{ s.direccion || 'Sin dirección registrada' }}</small></span>
+              </button>
+              <button type="button" class="solicitud-toggle" [attr.aria-expanded]="solicitudExpandida===s.codigo" [attr.aria-controls]="solicitudExpandida===s.codigo?'solicitud-info-'+s.codigo:null" [attr.aria-label]="(solicitudExpandida===s.codigo?'Ocultar':'Mostrar')+' datos de '+s.nombre" (click)="toggleSolicitud(s.codigo)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+            <div class="solicitud-detalle" *ngIf="solicitudExpandida===s.codigo" [id]="'solicitud-info-'+s.codigo">
+              <p><span>Dirección de la casa</span><strong>{{ s.direccion || 'No registrada' }}</strong><small *ngIf="s.referencia">Ref. {{ s.referencia }}</small></p>
+              <p><span>Teléfono</span><a *ngIf="s.telefono; else sinTelefono" [href]="'tel:'+s.telefono">{{ s.telefono }}</a><ng-template #sinTelefono><strong>No registrado</strong></ng-template></p>
+              <p><span>Cita</span><strong>{{ (s.fechaFiscalizacion || s.fecha) ? ((s.fechaFiscalizacion || s.fecha) | date:'dd/MM/yyyy':'UTC') : 'Sin fecha' }} · {{ s.horaFiscalizacion || s.hora || 'Sin hora' }}</strong></p>
+              <p class="solicitud-punto" *ngIf="tieneCoordenadas(s)"><span>Coordenadas</span><small>{{ s.latitud | number:'1.5-6' }}, {{ s.longitud | number:'1.5-6' }}</small></p>
+              <p class="solicitud-punto" *ngIf="!tieneCoordenadas(s)"><span>Ubicación</span><small>Pendiente de marcar en el mapa</small></p>
+            </div>
+          </article>
+        </div>
+        <ng-template #solicitudesVacias>
+          <p class="solicitudes-empty">{{ terminoBusqueda ? 'No hay solicitudes que coincidan con la búsqueda.' : 'No hay solicitudes registradas.' }}</p>
+        </ng-template>
+      </aside>
+    </div>
   </section>
 </main>

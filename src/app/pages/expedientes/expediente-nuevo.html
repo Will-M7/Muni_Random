@@ -37,22 +37,23 @@
       <label class="check-row"><input type="checkbox" [(ngModel)]="administradoAplica" name="administradoAplica"> Hay administrado identificado</label>
       <div class="form-grid admin-grid" *ngIf="administradoAplica">
         <div class="dni-group"><label>DNI <span class="required-mark">*</span><input [(ngModel)]="dni" name="dni" required maxlength="8" inputmode="numeric"></label><div class="inline-field"><button class="btn-light reniec-button" type="button" (click)="consultarDni()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg>Consultar RENIEC</button><small>{{reniecMensaje}}</small></div></div>
-        <label>Nombres <span class="required-mark">*</span><input [(ngModel)]="nombres" name="nombres" required></label>
-        <label>Apellidos <span class="required-mark">*</span><input [(ngModel)]="apellidos" name="apellidos" required></label>
-        <label>Teléfono<input [(ngModel)]="telefono" name="telefono" type="tel"></label>
+        <label>Nombres <span class="required-mark">*</span><input [(ngModel)]="nombres" (ngModelChange)="actualizarPopupPreview()" name="nombres" required></label>
+        <label>Apellidos <span class="required-mark">*</span><input [(ngModel)]="apellidos" (ngModelChange)="actualizarPopupPreview()" name="apellidos" required></label>
+        <label>Teléfono<input [(ngModel)]="telefono" (ngModelChange)="actualizarPopupPreview()" name="telefono" type="tel"></label>
       </div>
-      <div class="form-grid admin-grid"><label>Dirección exacta del predio <span class="required-mark">*</span><input [(ngModel)]="direccion" name="direccion" required></label><label>Referencia de domicilio<input [(ngModel)]="referencia" name="referencia"></label></div>
+      <div class="form-grid admin-grid"><label>Dirección exacta del predio <span class="required-mark">*</span><input [(ngModel)]="direccion" (ngModelChange)="direccionActualizada($event)" name="direccion" required placeholder="Ej. jirón San Martín n.º 317"></label><label>Referencia de domicilio<input [(ngModel)]="referencia" name="referencia"></label></div>
     </section>
 
     <section class="panel form-section">
       <div class="form-section-heading">
         <span class="form-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
-        <div><h2>Ubicación del predio</h2><p>{{ubicacionConfirmada?('Coordenadas confirmadas: '+latitud+', '+longitud):'Busca la dirección y confirma el punto exacto en el mapa.'}}</p></div>
+        <div><h2>Ubicación del predio</h2><p>{{ubicacionConfirmada?('Coordenadas del predio: '+latitud+', '+longitud):'La dirección se busca automáticamente y aparece con un pin rojo en el mapa.'}}</p></div>
       </div>
-      <div class="location-box">
-        <button type="button" class="btn-light" (click)="abrirModalUbicacion()">Seleccionar ubicación</button>
-        <p class="hint" *ngIf="ubicacionConfirmada">Punto confirmado: {{latitud}}, {{longitud}}</p>
+      <div class="location-box location-preview-heading">
+        <p class="hint" role="status">{{autoUbicacionBuscando?'Buscando la dirección…':(autoUbicacionMensaje||'Escribe el jirón y número para ubicar automáticamente la casa.')}}</p>
+        <button type="button" class="btn-light" (click)="seleccionarUbicacion()">Ajustar punto en el mapa</button>
       </div>
+      <div #locationPreview class="location-preview-map" aria-label="Vista previa del domicilio en el mapa"></div>
     </section>
 
     <section class="panel form-section">
@@ -67,6 +68,7 @@
 
     <section class="panel form-section schedule-section">
       <label class="check-row"><input type="checkbox" [(ngModel)]="programar" name="programar"><span class="form-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h3"/></svg></span><span><b>Crear primera programación</b><small>También puedes programarla más adelante.</small></span></label>
+      <p class="hint">Para que el domicilio aparezca en el mapa del fiscalizador, crea la programación y asígnala al fiscalizador correspondiente.</p>
       <div class="form-grid schedule-fields" *ngIf="programar">
         <label>Tipo de visita<select [(ngModel)]="tipoVisita" name="tipoVisita"><option value="PROGRAMADA">Programada</option></select></label>
         <label>Fecha operativa<input type="date" [(ngModel)]="fecha" name="fecha" (change)="cargarAgenda()" required></label>
@@ -77,17 +79,4 @@
     </section>
     <div class="form-actions"><a class="btn-light" routerLink="/expedientes">Cancelar</a><button type="submit" class="btn-primary" [disabled]="guardando">{{guardando?'Guardando…':'Crear fiscalización'}}</button></div>
   </form>
-  <dialog #locationDialog class="location-dialog" aria-labelledby="location-title">
-    <h2 id="location-title">Seleccionar ubicación del predio</h2>
-    <p>Abre Google Maps con la dirección, selecciona el punto, usa “Compartir” y copia el enlace. Los clics en otra pestaña no se transfieren automáticamente.</p>
-    <a *ngIf="direccion.trim()" class="btn-light" [href]="urlGoogleMaps()" target="_blank" rel="noopener">Abrir Google Maps con la dirección</a>
-    <p *ngIf="!direccion.trim()">Ingresa primero la dirección del predio para buscarla en Google Maps.</p>
-    <label>Enlace compartido de Google Maps<input [(ngModel)]="enlaceMaps" type="url" placeholder="Pega el enlace con coordenadas" (ngModelChange)="coordenadasPropuestas=null"></label>
-    <button type="button" class="btn-light" (click)="previsualizarEnlaceMaps()">Verificar coordenadas</button>
-    <p *ngIf="ubicacionMensaje" role="status">{{ubicacionMensaje}}</p>
-    <div *ngIf="coordenadasPropuestas as punto"><p>Latitud: <strong>{{punto[0]}}</strong> · Longitud: <strong>{{punto[1]}}</strong></p><a [href]="'https://www.google.com/maps/search/?api=1&query='+punto[0]+','+punto[1]" target="_blank" rel="noopener">Ver este punto en Google Maps</a><button type="button" class="btn-primary" (click)="confirmarCoordenadas()">Confirmar ubicación para el expediente</button></div>
-    <p *ngIf="ubicacionMensaje&&!coordenadasPropuestas">Si el enlace no incluye coordenadas, puedes marcar el punto con el selector interno.</p>
-    <a *ngIf="ubicacionMensaje&&!coordenadasPropuestas" class="btn-light" routerLink="/mapa" [queryParams]="{retorno:'expedientes/nuevo',q:direccion}" (click)="prepararMapa()">Usar selector interno</a>
-    <button type="button" class="btn-light" (click)="cerrarModalUbicacion()">Cerrar</button>
-  </dialog>
 </main>
