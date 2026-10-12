@@ -5,6 +5,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.core.annotation.Order;
 import org.springframework.transaction.annotation.Transactional;
 import pe.gob.munisanmiguel.entity.AppUser;
 import pe.gob.munisanmiguel.entity.Rol;
@@ -13,7 +14,7 @@ import pe.gob.munisanmiguel.repository.AppUserRepository;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
-@Component
+@Component @Order(0)
 public class BootstrapAdmin implements ApplicationRunner {
     private final AppUserRepository users;
     private final AppRoleRepository roles;

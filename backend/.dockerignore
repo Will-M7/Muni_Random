@@ -1,0 +1,7 @@
+target
+.env
+.env.*
+uploads
+scripts
+src/test
+*.log

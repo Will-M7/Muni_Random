@@ -38,6 +38,7 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   gpsCargando = false;
   guardando = false;
   descargando = false;
+  iniciandoProgramacionId: number|null = null;
   jornadaHtmlHabilitada = true;
   error = '';
   gpsMensaje = '';
@@ -128,6 +129,16 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   async responderAclaracion(id:number):Promise<void>{const response=this.respuestasAclaracion[id]?.trim();if(!response)return;this.guardando=true;this.error='';try{await this.service.responderAclaracion(id,response);delete this.respuestasAclaracion[id];this.aclaraciones=await this.service.misAclaraciones();}catch(e:any){this.error=e?.error?.message||'No se pudo responder la aclaración.';}finally{this.guardando=false;this.cdr.markForCheck();}}
   async cambiarFiltroHistorial(): Promise<void> { await this.cargar(); }
   abrirDiligencia(programacionId?: number): void { if (programacionId) void this.router.navigate(['/fiscalizador/diligencia', programacionId]); }
+  async iniciarDesdeAgenda(tarea:FiscalizadorTarea):Promise<void>{
+    if(!tarea.programacionId)return;
+    if(tarea.estadoProgramacion==='EN_CURSO'){this.abrirDiligencia(tarea.programacionId);return;}
+    if(!tarea.esExpediente||!['PROGRAMADA','VENCIDA'].includes(tarea.estadoProgramacion||'')||tarea.fecha!==todayPeru()){this.abrirDiligencia(tarea.programacionId);return;}
+    if(this.iniciandoProgramacionId)return;
+    this.iniciandoProgramacionId=tarea.programacionId;this.error='';this.cdr.markForCheck();
+    try{await this.service.iniciarDiligencia(tarea.programacionId,{estadoGps:'NO_DISPONIBLE'});this.abrirDiligencia(tarea.programacionId);}
+    catch(e:any){this.error=e?.error?.message||'No se pudo iniciar la fiscalización. Comprueba que la visita te corresponda y esté vigente.';}
+    finally{this.iniciandoProgramacionId=null;this.cdr.markForCheck();}
+  }
 
   actualizarUbicacion(): void {
     if (!navigator.geolocation) { this.gpsMensaje = 'Este navegador no ofrece ubicación GPS.'; return; }
@@ -165,7 +176,16 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
     finally { this.guardando = false; this.cdr.markForCheck(); }
   }
 
-  verEnMapa(tarea: FiscalizadorTarea): void { if(!this.coordenadasValidas(tarea)){this.gpsMensaje='Esta visita no tiene coordenadas válidas; consulta la dirección disponible.';this.cdr.markForCheck();return;}this.seleccionada = tarea; const point:Coordenadas=[tarea.latitud,tarea.longitud];setTimeout(() => { this.actualizarMapa(); this.mapa?.setView(point, 16); this.abrirPopupTarea(tarea); }); }
+  verEnMapa(tarea: FiscalizadorTarea): void {
+    this.seleccionada=tarea;const hasCoordinates=this.coordenadasValidas(tarea);
+    this.gpsMensaje=hasCoordinates?'':'Esta visita no tiene un punto exacto. Google Maps abrirá la dirección disponible.';
+    if(!hasCoordinates)this.abrirDomicilio(tarea);this.cdr.markForCheck();
+    setTimeout(()=>{
+      this.routeMap?.nativeElement.scrollIntoView({behavior:'smooth',block:'center'});
+      this.actualizarMapa();
+      if(hasCoordinates){const point:Coordenadas=[tarea.latitud,tarea.longitud];this.mapa?.setView(point,16);this.abrirPopupTarea(tarea);}
+    },0);
+  }
   abrirGoogleMaps(tarea: FiscalizadorTarea): void { if(!this.coordenadasValidas(tarea)||!this.ubicacionActual){this.abrirDomicilio(tarea);return;}const origen=this.ubicacionActual;const url=`https://www.google.com/maps/dir/?api=1&origin=${origen[0]},${origen[1]}&destination=${tarea.latitud},${tarea.longitud}&travelmode=driving`;window.open(url,'_blank','noopener'); }
   abrirDomicilio(tarea: FiscalizadorTarea): void { const destino=this.coordenadasValidas(tarea)?`${tarea.latitud},${tarea.longitud}`:tarea.direccion;if(!destino){this.gpsMensaje='Esta visita no tiene ubicación suficiente.';this.cdr.markForCheck();return;}window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destino)}`, '_blank', 'noopener'); }
   abrirRecorridoCompleto(): void { const orden=this.rutaOrdenada;if(!orden.length)return;if(orden.length===1&&!this.ubicacionActual){this.abrirDomicilio(orden[0]);return;}const origen=this.ubicacionActual||[orden[0].latitud,orden[0].longitud];const stops=this.ubicacionActual?orden:orden.slice(1);const destino=stops.at(-1)!;const waypoints=stops.slice(0,-1).map(t=>`${t.latitud},${t.longitud}`).join('|');const url=`https://www.google.com/maps/dir/?api=1&origin=${origen[0]},${origen[1]}&destination=${destino.latitud},${destino.longitud}${waypoints?`&waypoints=${encodeURIComponent(waypoints)}`:''}&travelmode=driving`;window.open(url,'_blank','noopener'); }
@@ -186,7 +206,7 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.routeMap?.nativeElement) return;
     const centro = this.ubicacionActual || (this.puntosMapa.length ? [this.puntosMapa[0].latitud, this.puntosMapa[0].longitud] as Coordenadas : null);
     if (!centro) return;
-    if (!this.mapa) { this.mapa = L.map(this.routeMap.nativeElement).setView(centro, 14); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(this.mapa); }
+    if (!this.mapa) { this.mapa = L.map(this.routeMap.nativeElement).setView(centro, 14); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(this.mapa); }
     this.mapa.eachLayer(layer => { if (layer instanceof L.Marker) this.mapa?.removeLayer(layer); });
     const markers: L.LatLngExpression[] = [];
     if (this.ubicacionActual) { L.marker(this.ubicacionActual, { icon: L.divIcon({ className: 'route-marker current-marker', html: '<span>0</span>', iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(this.mapa).bindPopup('Ubicación actual'); markers.push(this.ubicacionActual); }

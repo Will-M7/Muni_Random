@@ -8,6 +8,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 import pe.gob.munisanmiguel.dto.ApiDtos.*;
 import pe.gob.munisanmiguel.entity.ExpedienteDocumento;
+import pe.gob.munisanmiguel.entity.ExpedienteHistorial;
 import pe.gob.munisanmiguel.entity.OrigenFiscalizacion;
 import pe.gob.munisanmiguel.entity.EstadoExpediente;
 import pe.gob.munisanmiguel.exception.ConflictException;
@@ -15,6 +16,7 @@ import pe.gob.munisanmiguel.exception.NotFoundException;
 import pe.gob.munisanmiguel.repository.AppUserRepository;
 import pe.gob.munisanmiguel.repository.ExpedienteDocumentoRepository;
 import pe.gob.munisanmiguel.repository.ExpedienteFiscalizacionRepository;
+import pe.gob.munisanmiguel.repository.ExpedienteHistorialRepository;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -29,14 +31,16 @@ public class AltaFiscalizacionService {
     private final ExpedienteDocumentoRepository documentos;
     private final FiscalizacionFileStorageService storage;
     private final AppUserRepository users;
+    private final ExpedienteHistorialRepository historial;
 
     public AltaFiscalizacionService(ExpedienteFiscalizacionService expedientes,ExpedienteFiscalizacionRepository expedienteRepository,
-            ExpedienteDocumentoRepository documentos,FiscalizacionFileStorageService storage,AppUserRepository users){
-        this.expedientes=expedientes;this.expedienteRepository=expedienteRepository;this.documentos=documentos;this.storage=storage;this.users=users;
+            ExpedienteDocumentoRepository documentos,FiscalizacionFileStorageService storage,AppUserRepository users,ExpedienteHistorialRepository historial){
+        this.expedientes=expedientes;this.expedienteRepository=expedienteRepository;this.documentos=documentos;this.storage=storage;this.users=users;this.historial=historial;
     }
 
     @Transactional
     public ExpedienteResponse crear(CrearFiscalizacionRequest request,List<MultipartFile> files,String username){
+        storage.validateDocumentBatch(files);
         if(request.expediente().origen()==OrigenFiscalizacion.SOLICITUD&&
                 (blank(request.dependenciaProcedencia())==null||blank(request.referenciaSolicitud())==null))
             throw new ConflictException("Indique la dependencia y la referencia de la solicitud recibida.");
@@ -65,6 +69,7 @@ public class AltaFiscalizacionService {
                 document.setTipoMime(stored.mimeType());document.setTamanoBytes(stored.size());
                 document.setAdjuntadoEn(LocalDateTime.now(LIMA));document.setAdjuntadoPor(user);
                 documentos.save(document);
+                registrarAdjunto(expediente,document,user);
             }
         }
         return expedientes.obtener(result.codigo());
@@ -75,15 +80,27 @@ public class AltaFiscalizacionService {
         expedienteRepository.findByCodigo(codigo).orElseThrow(()->new NotFoundException("Expediente no encontrado."));
         return documentos.findAllByExpedienteCodigoOrderByAdjuntadoEnAscIdAsc(codigo).stream()
                 .map(d->new ExpedienteDocumentoResponse(d.getId(),d.getNombreOriginal(),d.getTipoMime(),
-                        d.getTamanoBytes(),d.getAdjuntadoEn(),d.getAdjuntadoPor().getUsername())).toList();
+                        d.getTamanoBytes(),d.getAdjuntadoEn(),d.getAdjuntadoPor().getUsername(),d.getCategoria())).toList();
     }
 
     @Transactional
     public List<ExpedienteDocumentoResponse> adjuntar(String codigo,List<MultipartFile> files,String username){
+        return adjuntar(codigo,files,username,"DOCUMENTO");
+    }
+
+    @Transactional
+    public List<ExpedienteDocumentoResponse> adjuntarActas(String codigo,List<MultipartFile> files,String username){
+        return adjuntar(codigo,files,username,"ACTA_ADJUNTA");
+    }
+
+    private List<ExpedienteDocumentoResponse> adjuntar(String codigo,List<MultipartFile> files,String username,String categoria){
+        if(files==null||files.isEmpty())throw new ConflictException("Selecciona al menos un documento.");
+        storage.validateDocumentBatch(files);
+        if("ACTA_ADJUNTA".equals(categoria)&&files.stream().anyMatch(file->file.getOriginalFilename()==null||!file.getOriginalFilename().toLowerCase(java.util.Locale.ROOT).endsWith(".pdf")))
+            throw new ConflictException("Las actas adjuntas deben ser archivos PDF.");
         var expediente=expedienteRepository.findByCodigo(codigo).orElseThrow(()->new NotFoundException("Expediente no encontrado."));
         if(expediente.getEstado()==EstadoExpediente.CERRADO||expediente.getEstado()==EstadoExpediente.CANCELADO)
             throw new ConflictException("No se pueden adjuntar documentos a un expediente cerrado o cancelado.");
-        if(files==null||files.isEmpty())throw new ConflictException("Selecciona al menos un documento.");
         var user=users.findByUsernameIgnoreCaseAndActivoTrue(username).orElseThrow();
         var storedNames=new ArrayList<String>();
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){
@@ -93,10 +110,19 @@ public class AltaFiscalizacionService {
             var stored=storage.storeEvidence(file,false);storedNames.add(stored.internalName());
             var document=new ExpedienteDocumento();document.setExpediente(expediente);
             document.setNombreOriginal(stored.originalName());document.setNombreInterno(stored.internalName());
-            document.setTipoMime(stored.mimeType());document.setTamanoBytes(stored.size());
+            document.setTipoMime(stored.mimeType());document.setTamanoBytes(stored.size());document.setCategoria(categoria);
             document.setAdjuntadoEn(LocalDateTime.now(LIMA));document.setAdjuntadoPor(user);documentos.save(document);
+            registrarAdjunto(expediente,document,user);
         }
         return listarDocumentos(codigo);
+    }
+
+    private void registrarAdjunto(pe.gob.munisanmiguel.entity.ExpedienteFiscalizacion expediente,ExpedienteDocumento document,pe.gob.munisanmiguel.entity.AppUser user){
+        var event=new ExpedienteHistorial();event.setExpediente(expediente);event.setFechaHora(document.getAdjuntadoEn());
+        event.setActor(user);event.setActorUsername(user.getUsername());
+        event.setTipoEvento("ACTA_ADJUNTA".equals(document.getCategoria())?"ACTA_ADJUNTA_SUBIDA":"DOCUMENTO_ADJUNTADO");
+        event.setDescripcion(("ACTA_ADJUNTA".equals(document.getCategoria())?"Acta adjunta subida: ":"Documento adjuntado: ")+document.getNombreOriginal());
+        historial.save(event);
     }
 
     @Transactional(readOnly=true)

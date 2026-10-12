@@ -5,11 +5,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.gob.munisanmiguel.dto.ApiDtos.UsuarioRequest;
 import pe.gob.munisanmiguel.dto.ApiDtos.UsuarioResponse;
+import pe.gob.munisanmiguel.dto.ApiDtos.UsuarioEdicionRequest;
+import pe.gob.munisanmiguel.dto.ApiDtos.UsuarioEliminacionResponse;
+import pe.gob.munisanmiguel.dto.ApiDtos.UsuarioEliminacionPreview;
 import pe.gob.munisanmiguel.entity.AppUser;
 import pe.gob.munisanmiguel.exception.ConflictException;
 import pe.gob.munisanmiguel.repository.AppUserRepository;
 import pe.gob.munisanmiguel.repository.AppRoleRepository;
 import pe.gob.munisanmiguel.repository.FiscalizadorRepository;
+import pe.gob.munisanmiguel.repository.UserPreferenceRepository;
 import pe.gob.munisanmiguel.entity.AppRole;
 import pe.gob.munisanmiguel.entity.Fiscalizador;
 import pe.gob.munisanmiguel.entity.Rol;
@@ -27,8 +31,10 @@ public class UsuarioService {
     private final AppRoleRepository roles;
     private final FiscalizadorRepository fiscalizadores;
     private final AdminSettingsService settings;
-    public UsuarioService(AppUserRepository users, PasswordEncoder encoder, AppRoleRepository roles,FiscalizadorRepository fiscalizadores,AdminSettingsService settings) { this.users = users; this.encoder = encoder; this.roles = roles; this.fiscalizadores=fiscalizadores;this.settings=settings; }
-    @Transactional(readOnly = true) public java.util.List<UsuarioResponse> listar() { return users.findAllByOrderByUsernameAsc().stream().map(this::toResponse).toList(); }
+    private final UserPreferenceRepository preferences;
+    private final UserHistoryService history;
+    public UsuarioService(AppUserRepository users, PasswordEncoder encoder, AppRoleRepository roles,FiscalizadorRepository fiscalizadores,AdminSettingsService settings,UserPreferenceRepository preferences,UserHistoryService history) { this.users = users; this.encoder = encoder; this.roles = roles; this.fiscalizadores=fiscalizadores;this.settings=settings;this.preferences=preferences;this.history=history; }
+    @Transactional(readOnly = true) public java.util.List<UsuarioResponse> listar(String filtro) { return users.findAllByOrderByUsernameAsc().stream().filter(u -> switch(filtro==null?"activos":filtro.toLowerCase(java.util.Locale.ROOT)){case "todos"->true;case "archivados"->u.getArchivedAt()!=null;default->u.getArchivedAt()==null&&u.isActivo();}).map(this::toResponse).toList(); }
     @Transactional public UsuarioResponse crear(UsuarioRequest request) {
         if (request.rol() == Rol.ADMIN_SISTEMA) throw new org.springframework.security.access.AccessDeniedException("No se pueden crear administradores desde este formulario.");
         if(request.password()==null||request.password().length()<8)throw new IllegalArgumentException("La contraseña debe tener al menos 8 caracteres.");
@@ -54,10 +60,54 @@ public class UsuarioService {
                 .toList();
     }
     @Transactional public UsuarioResponse cambiarEstado(String username, boolean activo) { var u=users.findByUsernameIgnoreCase(username).orElseThrow();
+        if(u.getArchivedAt()!=null)throw new ConflictException("Restaura la cuenta archivada antes de cambiar su estado.");
         if(!activo && u.isActivo() && u.getRoles().stream().anyMatch(r->"ADMIN_SISTEMA".equals(r.getName())) &&
                 users.activeAdminsForUpdate().stream().noneMatch(other->!other.getId().equals(u.getId())))
             throw new ConflictException("No se puede desactivar el último administrador activo.");
         u.setActivo(activo); return toResponse(u); }
+    @Transactional public UsuarioResponse editar(String currentUsername, UsuarioEdicionRequest request) {
+        var u=users.findByUsernameIgnoreCase(currentUsername).orElseThrow();
+        String username=request.username().trim(), nombre=request.nombre().trim();
+        if(users.findByUsernameIgnoreCase(username).filter(other->!other.getId().equals(u.getId())).isPresent())throw new ConflictException("El nombre de usuario ya existe.");
+        boolean admin=u.getRoles().stream().anyMatch(r->"ADMIN_SISTEMA".equals(r.getName()));
+        if(admin && request.rol()!=Rol.ADMIN_SISTEMA)throw new ConflictException("No se puede cambiar el tipo de una cuenta administradora.");
+        if(!admin && request.rol()==Rol.ADMIN_SISTEMA)throw new ConflictException("No se pueden crear administradores desde la edición de usuarios.");
+        if(request.password()!=null&&!request.password().isBlank()){
+            if(request.password().length()<8)throw new IllegalArgumentException("La contraseña debe tener al menos 8 caracteres.");
+            u.setPasswordHash(encoder.encode(request.password()));
+        }
+        Rol current=admin?Rol.ADMIN_SISTEMA:u.getRoles().stream().map(AppRole::getName).filter(n->n.equals("MUNICIPIO")||n.equals("FISCALIZADOR")).findFirst().map(Rol::valueOf).orElse(u.getRole());
+        if(current==Rol.MUNICIPIO&&request.rol()==Rol.FISCALIZADOR)vincularFiscalizador(u,null);
+        if(current==Rol.FISCALIZADOR&&request.rol()==Rol.MUNICIPIO)u.setFiscalizador(null); // Keep the operational record and its historical assignments.
+        u.getRoles().clear();u.getRoles().add(roles.findByName(request.rol().name()).orElseThrow());u.setRole(request.rol());u.setDisplayName(nombre);u.setUsername(username);
+        u.setCargo(switch(request.rol()){case MUNICIPIO->"Gestión municipal";case FISCALIZADOR->"Fiscalizador Técnico de Campo";case ADMIN_SISTEMA->"Administración del sistema";});
+        return toResponse(u);
+    }
+    @Transactional(readOnly=true) public UsuarioEliminacionPreview previsualizarEliminacion(String username) {
+        var u=users.findByUsernameIgnoreCase(username).orElseThrow();var refs=history.referencesToUser(u);
+        return new UsuarioEliminacionPreview(u.getUsername(),u.getDisplayName(),refs.isEmpty(),refs);
+    }
+    @Transactional public UsuarioEliminacionResponse eliminarOArchivar(String username,String actor) {
+        var u=users.findByUsernameIgnoreCase(username).orElseThrow();
+        if(u.getUsername().equalsIgnoreCase(actor))throw new ConflictException("No puedes eliminar ni archivar tu propia cuenta.");
+        boolean admin=u.getRoles().stream().anyMatch(r->"ADMIN_SISTEMA".equals(r.getName()));
+        if(admin&&u.isActivo()&&users.activeAdminsForUpdate().stream().noneMatch(other->!other.getId().equals(u.getId())))throw new ConflictException("No se puede eliminar ni archivar el último administrador activo.");
+        var refs=history.referencesToUser(u);
+        if(!refs.isEmpty()){
+            u.setActivo(false);u.setArchivedAt(LocalDateTime.now(ZoneId.of("America/Lima")));u.setArchivedBy(actor);
+            return new UsuarioEliminacionResponse(u.getUsername(),"ARCHIVADA",refs,"La cuenta tiene historial y fue archivada.");
+        }
+        var fiscalizador=u.getFiscalizador();preferences.deleteById(u.getId());users.delete(u);users.flush();
+        if(fiscalizador!=null)fiscalizadores.delete(fiscalizador);
+        return new UsuarioEliminacionResponse(username,"ELIMINADA",java.util.List.of(),"La cuenta sin historial fue eliminada.");
+    }
+    @Transactional public UsuarioResponse restaurar(String username,boolean archivado) {
+        var u=users.findByUsernameIgnoreCase(username).orElseThrow();
+        if(archivado)throw new ConflictException("El archivo se gestiona mediante la operación protegida de eliminación.");
+        if(u.getArchivedAt()==null)throw new ConflictException("La cuenta no está archivada.");
+        u.setArchivedAt(null);u.setArchivedBy(null);u.setActivo(true);
+        return toResponse(u);
+    }
     @Transactional public UsuarioResponse asignarRoles(String username, java.util.List<String> roleNames,String fiscalizadorId) {
         if (!canManageRoles() && roleNames.stream().anyMatch(r -> r.equals("ADMIN_SISTEMA"))) throw new org.springframework.security.access.AccessDeniedException("No puedes asignar ADMIN_SISTEMA.");
         var u=users.findByUsernameIgnoreCase(username).orElseThrow();
@@ -93,5 +143,5 @@ public class UsuarioService {
         user.setFiscalizador(fiscalizadores.save(nuevo));
     }
     private boolean canManageRoles() { var auth=SecurityContextHolder.getContext().getAuthentication();return auth!=null&&auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLES_GESTIONAR")); }
-    private UsuarioResponse toResponse(AppUser user) { return new UsuarioResponse(user.getUsername(), user.getDisplayName(), user.getRoles().stream().map(AppRole::getName).sorted().findFirst().orElse(""), user.isActivo(), user.getCreatedAt() == null ? LocalDate.now().toString() : user.getCreatedAt().toLocalDate().toString(), user.getRoles().stream().map(AppRole::getName).sorted().toList(),user.getFiscalizador()==null?null:user.getFiscalizador().getId(),user.getFiscalizador()==null?null:user.getFiscalizador().getNombre()); }
+    private UsuarioResponse toResponse(AppUser user) { return new UsuarioResponse(user.getUsername(), user.getDisplayName(), user.getRoles().stream().map(AppRole::getName).sorted().findFirst().orElse(""), user.isActivo(), user.getCreatedAt() == null ? LocalDate.now().toString() : user.getCreatedAt().toLocalDate().toString(), user.getRoles().stream().map(AppRole::getName).sorted().toList(),user.getFiscalizador()==null?null:user.getFiscalizador().getId(),user.getFiscalizador()==null?null:user.getFiscalizador().getNombre(),user.getArchivedAt()!=null); }
 }

@@ -13,6 +13,7 @@ public class ExpedienteDocumento {
     @Column(name="nombre_original",nullable=false,length=255) private String nombreOriginal;
     @Column(name="nombre_interno",nullable=false,unique=true,length=120) private String nombreInterno;
     @Column(name="tipo_mime",nullable=false,length=120) private String tipoMime;
+    @Column(name="categoria",nullable=false,length=24) private String categoria="DOCUMENTO";
     @Column(name="tamano_bytes",nullable=false) private long tamanoBytes;
     @Column(name="adjuntado_en",nullable=false) private LocalDateTime adjuntadoEn;
     @ManyToOne(fetch=FetchType.LAZY,optional=false) @JoinColumn(name="adjuntado_por_id",nullable=false) private AppUser adjuntadoPor;

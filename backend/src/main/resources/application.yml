@@ -19,7 +19,7 @@ spring:
   servlet:
     multipart:
       max-file-size: ${APP_MAX_FILE_SIZE:10MB}
-      max-request-size: ${APP_MAX_REQUEST_SIZE:12MB}
+      max-request-size: ${APP_MAX_REQUEST_SIZE:105MB}
 server:
   port: ${SERVER_PORT:8080}
 app:
@@ -35,7 +35,9 @@ app:
   cors-origins: ${CORS_ORIGINS:http://localhost:4200}
   storage:
     path: ${APP_STORAGE_PATH:uploads/solicitudes}
+    diligencias-path: ${APP_DILIGENCIAS_PATH:uploads/diligencias}
     max-size-bytes: ${APP_MAX_FILE_SIZE_BYTES:10485760}
+    max-batch-size-bytes: ${APP_MAX_BATCH_SIZE_BYTES:104857600}
   reniec:
     mode: ${RENIEC_MODE:disabled}
     base-url: ${RENIEC_BASE_URL:}

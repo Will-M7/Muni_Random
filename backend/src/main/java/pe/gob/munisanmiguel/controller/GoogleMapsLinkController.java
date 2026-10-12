@@ -15,9 +15,10 @@ public class GoogleMapsLinkController {
     public record LinkRequest(String url){}
     @PostMapping("/resolver") @PreAuthorize("hasAuthority('EXPEDIENTE_CREAR')")
     public Map<String,String> resolve(@RequestBody LinkRequest request){
-        try{URI uri=validated(URI.create(request.url()));
-            for(int i=0;i<4;i++){
+        try{if(request==null||request.url()==null||request.url().isBlank())throw new IllegalArgumentException("Pega un enlace HTTPS de Google Maps.");URI uri=validated(URI.create(request.url()));
+            for(int i=0;i<=5;i++){
                 if(!Set.of("maps.app.goo.gl","goo.gl").contains(uri.getHost().toLowerCase()))return Map.of("url",uri.toString());
+                if(i==5)break;
                 var response=client.send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(4)).method("HEAD",HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.discarding());
                 if(response.statusCode()<300||response.statusCode()>399)break;
                 var location=response.headers().firstValue("Location").orElseThrow();uri=validated(uri.resolve(location));

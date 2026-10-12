@@ -20,11 +20,10 @@
       </div>
       <div class="form-grid origin-grid">
         <label>Origen <span class="required-mark">*</span><select [(ngModel)]="origen" name="origen" required><option *ngFor="let o of origenes" [value]="o[0]">{{o[1]}}</option></select></label>
-        <label *ngIf="origen==='SOLICITUD'">Solicitud legacy vinculada (opcional)<select [(ngModel)]="solicitudCodigo" name="solicitud" (change)="cargarSolicitud()"><option value="">Sin vínculo legacy</option><option *ngFor="let s of solicitudes" [value]="s.codigo">{{s.codigo}} · {{s.nombre}} · {{s.dni}}</option></select></label>
         <label *ngIf="origen==='SOLICITUD'">Dependencia de procedencia <span class="required-mark">*</span><input [(ngModel)]="dependenciaProcedencia" name="dependenciaProcedencia" maxlength="160" required></label>
         <label *ngIf="origen==='SOLICITUD'">Número o referencia de solicitud recibida <span class="required-mark">*</span><input [(ngModel)]="referenciaSolicitud" name="referenciaSolicitud" maxlength="160" required></label>
-        <label>Referencia o detalle del origen<textarea [(ngModel)]="detalleOrigen" name="detalleOrigen" rows="2" placeholder="Referencia, documento o memorando"></textarea></label>
         <label>Objeto de la fiscalización <span class="required-mark">*</span><textarea [(ngModel)]="objetoFiscalizacion" name="objeto" rows="2" required maxlength="255" placeholder="Indica qué debe verificarse en la visita"></textarea></label>
+        <label>Referencia o detalle del origen<textarea [(ngModel)]="detalleOrigen" name="detalleOrigen" rows="2" placeholder="Referencia, documento o memorando"></textarea></label>
         <label>Observaciones iniciales (opcional)<textarea [(ngModel)]="observacionesIniciales" name="observaciones" rows="2"></textarea></label>
       </div>
     </section>
@@ -36,7 +35,7 @@
       </div>
       <label class="check-row"><input type="checkbox" [(ngModel)]="administradoAplica" name="administradoAplica"> Hay administrado identificado</label>
       <div class="form-grid admin-grid" *ngIf="administradoAplica">
-        <div class="dni-group"><label>DNI <span class="required-mark">*</span><input [(ngModel)]="dni" (ngModelChange)="dniActualizado()" name="dni" required maxlength="8" inputmode="numeric"></label><div class="inline-field"><small>{{reniecMensaje||(!dniDisponible?'Ingreso manual disponible.':'La consulta se hará al completar 8 dígitos.')}}</small></div></div>
+        <div class="dni-group"><label>DNI <span class="required-mark">*</span><input [(ngModel)]="dni" (ngModelChange)="dniActualizado()" name="dni" required maxlength="8" inputmode="numeric" autocomplete="off"></label><div class="inline-field"><button type="button" class="btn-light" [disabled]="consultandoDni||!!cuotaDni?.exhausted" (click)="consultarDni()">{{consultandoDni?'Consultando…':'Consultar DNI'}}</button><small role="status">{{reniecMensaje||'La consulta se ejecuta solo al pulsar el botón; también puedes completar los datos manualmente.'}}</small></div></div>
         <label>Nombres <span class="required-mark">*</span><input [(ngModel)]="nombres" (ngModelChange)="actualizarPopupPreview()" name="nombres" required></label>
         <label>Apellidos <span class="required-mark">*</span><input [(ngModel)]="apellidos" (ngModelChange)="actualizarPopupPreview()" name="apellidos" required></label>
         <label>Teléfono<input [(ngModel)]="telefono" (ngModelChange)="actualizarPopupPreview()" name="telefono" type="tel"></label>
@@ -50,15 +49,20 @@
         <div><h2>Ubicación del predio</h2><p>{{ubicacionConfirmada?('Coordenadas confirmadas: '+latitud+', '+longitud):'Selecciona un punto exacto del predio.'}}</p></div>
       </div>
       <div class="location-box location-preview-heading">
-        <p class="hint" role="status">{{autoUbicacionBuscando?'Buscando la dirección…':(autoUbicacionMensaje||'Escribe el jirón y número para ubicar automáticamente la casa.')}}</p>
-        <button *ngIf="preferencias.mapaInterno" type="button" class="btn-light" (click)="seleccionarUbicacion()">{{ubicacionConfirmada?'Ajustar ubicación en mapa':'Seleccionar en mapa interno'}}</button>
-        <button *ngIf="preferencias.googleExterno" type="button" class="btn-light" (click)="abrirGoogle()">Abrir Google Maps y recuperar enlace</button>
-        <button *ngIf="ubicacionConfirmada" type="button" class="btn-light" (click)="ajustarUbicacion()">Ajustar ubicación</button>
+        <p class="hint" role="status">{{autoUbicacionBuscando?'Buscando la dirección…':(ubicacionPendiente?'Vista previa: '+ubicacionPendiente.latitud+', '+ubicacionPendiente.longitud:ubicacionConfirmada?'Coordenadas confirmadas: '+latitud+', '+longitud:(autoUbicacionMensaje||'Escribe la dirección y selecciona un método para confirmar el punto.'))}}</p>
+        <button *ngIf="ubicacionConfirmada&&!seleccionandoUbicacion&&!ubicacionPendiente" type="button" class="btn-light" (click)="ajustarUbicacion()">Ajustar ubicación</button>
       </div>
-      <div *ngIf="preferencias.googleUrl&&!ubicacionConfirmada" class="google-paste"><label>URL compartida de Google Maps<input [(ngModel)]="googleLink" name="googleLink" type="url" placeholder="https://www.google.com/maps/place/..."></label><button type="button" class="btn-light" (click)="confirmarGoogle()">Confirmar punto del enlace</button></div>
-      <p class="error" *ngIf="googleError" role="alert">{{googleError}}</p>
-      <div *ngIf="ubicacionConfirmada" #locationPreview class="location-preview-map" aria-label="Vista previa del domicilio en el mapa"></div>
-      <div *ngIf="googleModal" class="google-modal-backdrop"><section class="google-modal" role="dialog" aria-modal="true" aria-label="Recuperar ubicación de Google Maps"><h3>Recuperar punto de Google Maps</h3><p>En Google Maps selecciona el marcador del predio y usa Compartir. Luego pega el enlace. Los clics en esa pestaña no se pueden leer aquí.</p><label>Enlace compartido<input [(ngModel)]="googleLink" name="googleModalLink" type="url"></label><p class="error" *ngIf="googleError">{{googleError}}</p><div><button type="button" class="btn-light" (click)="leerPortapapeles()">Leer portapapeles</button><button type="button" class="btn-light" (click)="confirmarGoogle()">Confirmar enlace</button><button type="button" class="btn-light" (click)="googleModal=false">Cerrar</button></div></section></div>
+      <div *ngIf="!ubicacionConfirmada||seleccionandoUbicacion||ubicacionPendiente" class="location-methods">
+        <p *ngIf="ubicacionConfirmada" class="hint">La ubicación actual se conserva hasta que confirmes un nuevo punto.</p>
+        <button *ngIf="preferencias.mapaInterno" type="button" class="btn-light" (click)="seleccionarUbicacion()">Seleccionar en mapa interno</button>
+        <button *ngIf="preferencias.googleExterno" type="button" class="btn-light" (click)="abrirGoogle()">Seleccionar con Google Maps</button>
+        <div *ngIf="preferencias.googleUrl" class="google-paste"><label>Pegar enlace compartido de Google Maps<input [(ngModel)]="googleLink" (ngModelChange)="cambiarEnlaceGoogle()" name="googleLink" type="url" placeholder="https://maps.app.goo.gl/..."></label><button type="button" class="btn-light" (click)="confirmarGoogle()">Vista previa del enlace</button></div>
+        <div *ngIf="ubicacionPendiente" class="location-confirm-actions"><button type="button" class="btn-primary" (click)="confirmarUbicacionPendiente()">Confirmar ubicación</button><button *ngIf="ubicacionPendiente.metodo==='GOOGLE_EXTERNO'" type="button" class="btn-light" (click)="googleModal=true">Corregir coordenadas</button><button type="button" class="btn-light" (click)="cancelarAjusteUbicacion()">Cancelar ajuste</button></div>
+        <button *ngIf="ubicacionConfirmada&&!ubicacionPendiente" type="button" class="btn-light" (click)="cancelarAjusteUbicacion()">Cancelar ajuste</button>
+      </div>
+      <p class="error" *ngIf="googleError&&!googleModal" role="alert">{{googleError}}</p>
+      <div *ngIf="ubicacionConfirmada||ubicacionPendiente" #locationPreview class="location-preview-map" aria-label="Vista previa del domicilio en el mapa"></div>
+      <div *ngIf="googleModal&&preferencias.googleExterno" class="google-modal-backdrop"><section class="google-modal" role="dialog" aria-modal="true" aria-label="Seleccionar ubicación con Google Maps"><h3>Seleccionar con Google Maps</h3><p>Google Maps se abre con la dirección del predio. En el mapa, marca el punto, usa «¿Qué hay aquí?» y copia las coordenadas que aparecen (latitud, longitud). Esta pantalla no puede leer tus clics dentro de Google Maps.</p><label>Coordenadas del punto<input [(ngModel)]="coordenadasGoogle" name="coordenadasGoogle" inputmode="decimal" placeholder="-15.40, -70.12"></label><p>También puedes escribir o pegar las coordenadas manualmente.</p><p class="error" *ngIf="googleError" role="alert">{{googleError}}</p><div><button type="button" class="btn-light" (click)="leerPortapapeles()">Pegar desde portapapeles</button><button type="button" class="btn-primary" (click)="previsualizarCoordenadasGoogle()">Ver punto</button><button type="button" class="btn-light" (click)="googleModal=false">Cerrar</button></div></section></div>
     </section>
 
     <section class="panel form-section">
@@ -66,8 +70,9 @@
         <span class="form-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v20h16V8Z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg></span>
         <div><h2>Documentos iniciales</h2><p>Adjunta fotografías o documentos cuando corresponda.</p></div>
       </div>
-      <label class="file-label">Archivos iniciales<input type="file" multiple accept=".jpg,.jpeg,.png,.pdf,.docx,.doc" (change)="seleccionarArchivo($event)"></label>
-      <small class="file-name" *ngIf="archivos.length">{{archivos.length}} archivo(s) seleccionado(s)</small>
+      <label class="file-label">Archivos iniciales (opcional)<input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" (change)="seleccionarArchivo($event)"></label>
+      <small class="file-name">{{archivos.length}} de 10 archivos</small>
+      <ul class="selected-files" *ngIf="archivos.length"><li *ngFor="let file of archivos;let i=index"><span>{{file.name}} <small>({{(file.size/1024/1024).toFixed(2)}} MB)</small></span><button type="button" class="btn-light" (click)="quitarArchivo(i)" [attr.aria-label]="'Quitar '+file.name">Quitar</button></li></ul>
       <small class="file-name" *ngIf="!archivos.length&&origenConDocumento">Puedes continuar sin documentos adjuntos.</small>
     </section>
 

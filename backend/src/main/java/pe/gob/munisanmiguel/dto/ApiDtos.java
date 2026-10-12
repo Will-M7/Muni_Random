@@ -47,7 +47,13 @@ public final class ApiDtos {
             String estadoProgramacion, String estadoExpediente, Long programacionId, Long diligenciaId,
             String estadoDiligencia, String solicitudCodigo) {}
     public record ResultadoFiscalizacionRequest(@NotNull pe.gob.munisanmiguel.entity.ResultadoFiscalizacion resultado, String observaciones) {}
-    public record UsuarioResponse(String username, String nombre, String rol, boolean activo, String fechaCreacion, List<String> roles,String fiscalizadorId,String fiscalizadorNombre) {}
+    public record UsuarioResponse(String username, String nombre, String rol, boolean activo, String fechaCreacion, List<String> roles,String fiscalizadorId,String fiscalizadorNombre,boolean archivado) {}
+    public record UsuarioEdicionRequest(@NotBlank String username, @NotBlank String nombre, String password, @NotNull Rol rol) {}
+    public record UsuarioEliminacionResponse(String username, String accion, List<String> referencias, String mensaje) {}
+    public record UsuarioEliminacionPreview(String username, String nombre, boolean puedeEliminar, List<String> referencias) {}
+    public record UsuarioEliminacionLoteRequest(@NotNull List<@NotBlank String> usernames) {}
+    public record UsuarioEliminacionLoteResponse(List<UsuarioEliminacionResponse> resultados) {}
+    public record UsuarioArchivadoRequest(boolean archivado) {}
     public record UsuarioRequest(@NotBlank String username, @NotBlank String nombre, @NotBlank @Size(min = 8) String password,
                                  String confirmarPassword, @NotNull Rol rol, String fiscalizadorId) {}
     public record RoleResponse(String nombre, String descripcion, boolean configurable, List<String> capacidades) {}
@@ -60,14 +66,15 @@ public final class ApiDtos {
                                     String tipoAdministrado, String documentoAdministrado, String nombreAdministrado,
                                     String telefonoContacto, String direccionFiscalizada, String solicitudCodigo,
                                     String administradoApellidos, String referenciaDomicilio,
-                                    java.math.BigDecimal latitud, java.math.BigDecimal longitud) {}
+                                    @DecimalMin("-90") @DecimalMax("90") java.math.BigDecimal latitud,
+                                    @DecimalMin("-180") @DecimalMax("180") java.math.BigDecimal longitud) {}
     public record CrearFiscalizacionRequest(@NotNull @Valid ExpedienteRequest expediente,
             @Size(max=160) String dependenciaProcedencia,@Size(max=160) String referenciaSolicitud,
             @Valid ProgramacionRequest primeraProgramacion,String metodoUbicacion,String enlaceGoogle) {
         public CrearFiscalizacionRequest(ExpedienteRequest expediente,String dependenciaProcedencia,String referenciaSolicitud,ProgramacionRequest primeraProgramacion){this(expediente,dependenciaProcedencia,referenciaSolicitud,primeraProgramacion,null,null);}
     }
     public record ExpedienteDocumentoResponse(Long id,String nombre,String tipoMime,long tamanoBytes,
-            LocalDateTime adjuntadoEn,String adjuntadoPor) {}
+            LocalDateTime adjuntadoEn,String adjuntadoPor,String categoria) {}
     public record ProgramacionRequest(String fiscalizadorId, @NotNull LocalDate fecha, @NotNull LocalTime hora,
                                       @NotNull pe.gob.munisanmiguel.entity.TipoVisita tipoVisita) {}
     public record ReprogramarRequest(@NotNull LocalDate fecha, @NotNull LocalTime hora, @NotBlank String motivo,
@@ -102,8 +109,8 @@ public final class ApiDtos {
             String detalleMotivo, String observacionesFiscalizador, String ocurrencias,
             pe.gob.munisanmiguel.entity.EstadoGps estadoGps, @DecimalMin("-90") @DecimalMax("90") BigDecimal latitud,
             @DecimalMin("-180") @DecimalMax("180") BigDecimal longitud) {}
-    public record FinalizarDiligenciaRequest(@NotNull pe.gob.munisanmiguel.entity.EstadoFirmaActa firmaFiscalizado,
-            String observacionFirma, boolean copiaEntregada, @NotNull pe.gob.munisanmiguel.entity.MedioEntrega medioEntrega,
+    public record FinalizarDiligenciaRequest(pe.gob.munisanmiguel.entity.EstadoFirmaActa firmaFiscalizado,
+            String observacionFirma, boolean copiaEntregada, pe.gob.munisanmiguel.entity.MedioEntrega medioEntrega,
             pe.gob.munisanmiguel.entity.EstadoGps estadoGpsCierre, @DecimalMin("-90") @DecimalMax("90") BigDecimal latitudCierre,
             @DecimalMin("-180") @DecimalMax("180") BigDecimal longitudCierre) {}
     public record ParticipanteResponse(Long id, String tipoParticipante, String nombre, String apellidos,
@@ -111,6 +118,7 @@ public final class ApiDtos {
             String observaciones, LocalDateTime creadoEn, String creadoPor) {}
     public record EvidenciaResponse(Long id, String tipo, String nombreOriginal, String tipoMime,
             long tamanoBytes, String descripcion, LocalDateTime fechaHora, String autor) {}
+    public record RetirarEvidenciaRequest(@NotBlank @Size(max=500) String motivo) {}
     public record ActaResumenResponse(Long id, String codigo, String firmaFiscalizadoEstado,
             String pdfGeneradoNombre, String pdfFirmadoNombre, LocalDateTime generadoEn) {}
     public record DiligenciaWorkspaceResponse(Long id, String expedienteCodigo, String origen,
@@ -137,7 +145,7 @@ public final class ApiDtos {
     public record SolicitarAclaracionRequest(@jakarta.validation.constraints.NotBlank String mensaje) {}
     public record ResponderAclaracionRequest(@jakarta.validation.constraints.NotBlank String respuesta) {}
     public record ConcluirRevisionRequest(@NotNull pe.gob.munisanmiguel.entity.ConclusionFiscalizacion conclusion,
-            @NotBlank String fundamentoConclusion, String observacionesRevision, String descripcionConclusion,
+            String fundamentoConclusion, String observacionesRevision, String descripcionConclusion,
             String plazoConclusion, boolean requiereSeguimiento, boolean requiereDerivacion,
             String denominacionOtra, String referenciaDocumentos) {}
     public record SeguimientoRequest(@NotNull LocalDate fecha, @NotNull LocalTime hora,

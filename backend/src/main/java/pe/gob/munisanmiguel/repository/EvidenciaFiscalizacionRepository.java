@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface EvidenciaFiscalizacionRepository extends JpaRepository<EvidenciaFiscalizacion,Long> {
     List<EvidenciaFiscalizacion> findAllByDiligenciaIdOrderByFechaHoraAscIdAsc(Long diligenciaId);
     Optional<EvidenciaFiscalizacion> findByIdAndDiligenciaId(Long id,Long diligenciaId);
+    List<EvidenciaFiscalizacion> findAllByDiligenciaIdAndRetiradoEnIsNullOrderByFechaHoraAscIdAsc(Long diligenciaId);
+    Optional<EvidenciaFiscalizacion> findByIdAndDiligenciaIdAndRetiradoEnIsNull(Long id,Long diligenciaId);
 }

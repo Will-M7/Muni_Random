@@ -75,10 +75,9 @@ class RevisionFiscalizacionConclusionTest {
         eventos=new ArrayList<>(); when(historial.save(any())).thenAnswer(a->{ExpedienteHistorial h=a.getArgument(0);eventos.add(h);return h;});
     }
 
-    @Test void conformidadRequiereFundamentoYNoAdmiteSeguimiento() {
+    @Test void conformidadPermiteFundamentoVacioYNoAdmiteSeguimiento() {
         var validator=jakarta.validation.Validation.buildDefaultValidatorFactory().getValidator();
-        assertTrue(validator.validate(request(ConclusionFiscalizacion.CONFORMIDAD,"",null,null,false,false,null)).stream()
-                .anyMatch(v->v.getPropertyPath().toString().equals("fundamentoConclusion")));
+        assertTrue(validator.validate(request(ConclusionFiscalizacion.CONFORMIDAD,"",null,null,false,false,null)).isEmpty());
         reset(revisions); when(revisions.findLocked(REVISION_ID)).thenReturn(Optional.of(revision));
         assertThrows(RuntimeException.class,()->service.concluir(REVISION_ID,request(ConclusionFiscalizacion.CONFORMIDAD,"Fundamento",null,null,true,false,null),MUNICIPIO));
         assertEquals(EstadoExpediente.PENDIENTE_REVISION,expediente.getEstado());
@@ -101,8 +100,9 @@ class RevisionFiscalizacionConclusionTest {
         assertFalse(eventos.stream().anyMatch(e->e.getTipoEvento().equals("EXPEDIENTE_CERRADO")));
     }
 
-    @Test void advertenciaExigeDescripcionYNoGeneraSancionAutomatica() {
-        assertThrows(RuntimeException.class,()->service.concluir(REVISION_ID,request(ConclusionFiscalizacion.ADVERTENCIA,"Fundamento.",null,null,false,false,null),MUNICIPIO));
+    @Test void advertenciaAdmiteDescripcionVaciaYNoGeneraSancionAutomatica() {
+        service.concluir(REVISION_ID,request(ConclusionFiscalizacion.ADVERTENCIA,"",null,null,false,false,null),MUNICIPIO);
+        assertNull(revision.getFundamentoConclusion());assertNull(revision.getDescripcionConclusion());
         setUp();
         service.concluir(REVISION_ID,request(ConclusionFiscalizacion.ADVERTENCIA,"Fundamento.","Advertencia sintética registrada por MUNICIPIO.",null,false,false,null),MUNICIPIO);
         assertEquals("Advertencia sintética registrada por MUNICIPIO.",revision.getDescripcionConclusion());
@@ -125,18 +125,18 @@ class RevisionFiscalizacionConclusionTest {
         assertEquals(EstadoExpediente.CERRADO,expediente.getEstado());
     }
 
-    @Test void medidaCorrectivaRequiereDescripcionYPersisteLiteralMunicipal() {
-        assertThrows(RuntimeException.class,()->service.concluir(REVISION_ID,request(ConclusionFiscalizacion.MEDIDA_CORRECTIVA,"Fundamento.",null,null,true,false,null),MUNICIPIO));
+    @Test void medidaCorrectivaAdmiteDescripcionVaciaYPersisteLiteralMunicipal() {
+        service.concluir(REVISION_ID,request(ConclusionFiscalizacion.MEDIDA_CORRECTIVA,"",null,null,true,false,null),MUNICIPIO);
+        assertNull(revision.getDescripcionConclusion());
         setUp();
         String medida="Instalar señal sintética de prueba en el acceso indicado.";
         service.concluir(REVISION_ID,request(ConclusionFiscalizacion.MEDIDA_CORRECTIVA,"Fundamento de medida.",medida,"20 días",true,false,null),MUNICIPIO);
         assertEquals(medida,revision.getDescripcionConclusion()); assertEquals(EstadoExpediente.EN_SEGUIMIENTO,expediente.getEstado());
     }
 
-    @Test void otraExigeDenominacionYDescripcion() {
-        assertThrows(RuntimeException.class,()->service.concluir(REVISION_ID,request(ConclusionFiscalizacion.OTRA,"Fundamento.","Detalle",null,false,false,null),MUNICIPIO));
-        setUp();
-        assertThrows(RuntimeException.class,()->service.concluir(REVISION_ID,request(ConclusionFiscalizacion.OTRA,"Fundamento.",null,null,false,false,"Conclusión especial"),MUNICIPIO));
+    @Test void otraAdmiteTextosOpcionales() {
+        service.concluir(REVISION_ID,request(ConclusionFiscalizacion.OTRA,"",null,null,false,false,null),MUNICIPIO);
+        assertNull(revision.getDenominacionOtra());
         setUp();
         service.concluir(REVISION_ID,request(ConclusionFiscalizacion.OTRA,"Fundamento.","Detalle sintético.",null,false,false,"Conclusión especial"),MUNICIPIO);
         assertEquals("Conclusión especial",revision.getDenominacionOtra());

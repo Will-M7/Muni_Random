@@ -18,4 +18,7 @@ public class EvidenciaFiscalizacion {
     @Column(length=500) private String descripcion;
     @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="creado_por_id") private AppUser creadoPor;
     @Column(name="fecha_hora",nullable=false) private LocalDateTime fechaHora;
+    @Column(name="retirado_en") private LocalDateTime retiradoEn;
+    @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="retirado_por_id") private AppUser retiradoPor;
+    @Column(name="motivo_retiro",length=500) private String motivoRetiro;
 }

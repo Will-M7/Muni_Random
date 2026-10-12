@@ -11,6 +11,8 @@ public class IdentityIntegration {
     @Column(nullable=false,length=24) private String provider="DISABLED";
     @Column(length=500) private String endpoint;
     @Column(name="encrypted_api_key",columnDefinition="TEXT") private String encryptedApiKey;
+    @Column(name="encrypted_peruapi_key",columnDefinition="TEXT") private String encryptedPeruapiKey;
+    @Column(name="encrypted_factiliza_token",columnDefinition="TEXT") private String encryptedFactilizaToken;
     @Column(name="encrypted_client_id",columnDefinition="TEXT") private String encryptedClientId;
     @Column(name="encrypted_client_secret",columnDefinition="TEXT") private String encryptedClientSecret;
     @Column(name="actualizado_por") private String actualizadoPor;

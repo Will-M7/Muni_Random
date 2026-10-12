@@ -6,337 +6,209 @@ import * as L from 'leaflet';
 import { MUNICIPALIDAD_SAN_MIGUEL_COORDS, VerificacionService } from '../../services/verificacion.service';
 import { Solicitud } from '../../models/solicitud.model';
 
-@Component({
-  selector: 'app-mapa',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: './mapa.html',
-  styleUrl: './mapa.css',
-})
+export interface GeoSuggestion { display_name: string; lat: string; lon: string; }
+
+export function parseCoordinates(raw: string): [number, number] | null {
+  const decimal = raw.trim().match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(?:,\s*|\s+)\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))$/);
+  if (decimal) return validPoint(Number(decimal[1]), Number(decimal[2]));
+
+  const dms = [...raw.matchAll(/(?:^|\s)([NSEWO])?\s*(\d{1,3})(?:[.,](\d+))?\s*[°º]\s*(\d{1,2})(?:[.,](\d+))?\s*(?:['′]\s*(\d{1,2}(?:[.,]\d+)?)\s*(?:["″])?)?\s*([NSEWO])?(?=$|\s)/gi)];
+  if (dms.length !== 2) return null;
+  const values = dms.map(match => {
+    const degrees = Number(match[2] + (match[3] ? `.${match[3]}` : ''));
+    const minutes = Number(match[4] + (match[5] ? `.${match[5]}` : ''));
+    const seconds = match[6] ? Number(match[6].replace(',', '.')) : 0;
+    const direction = (match[1] || match[7] || '').toUpperCase();
+    const negative = direction === 'S' || direction === 'W' || direction === 'O';
+    if (!Number.isFinite(degrees + minutes + seconds) || minutes >= 60 || seconds >= 60 || (direction && !'NSEWO'.includes(direction))) return null;
+    return (negative ? -1 : 1) * (Math.abs(degrees) + minutes / 60 + seconds / 3600);
+  });
+  if (values.some(value => value === null)) return null;
+  let [lat, lon] = values as number[];
+  const directions = dms.map(match => (match[1] || match[7] || '').toUpperCase());
+  if (directions.some(d => d === 'E' || d === 'W' || d === 'O') && (directions[0] === 'E' || directions[0] === 'W' || directions[0] === 'O')) [lat, lon] = [lon, lat];
+  return validPoint(lat, lon);
+}
+
+function validPoint(lat: number, lon: number): [number, number] | null {
+  return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 ? [lat, lon] : null;
+}
+
+export function normalizedGeocodeQuery(raw: string): string {
+  let q = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').replace(/\s+/g, ' ').trim();
+  q = q.replace(/\b(jr|jron|jiron)\b\.?/g, 'jiron').replace(/\b(av|avda)\b\.?/g, 'avenida').replace(/\b(psje|psj)\b\.?/g, 'pasaje');
+  return /\b(san miguel|juliaca|puno|peru)\b/.test(q) ? q : `${q}, San Miguel, Juliaca, Puno, Perú`;
+}
+
+@Component({ selector: 'app-mapa', standalone: true, imports: [CommonModule, FormsModule], templateUrl: './mapa.html', styleUrl: './mapa.css' })
 export class MapaComponent implements OnInit, AfterViewInit, OnDestroy {
   private mapa!: L.Map;
-  private marcador!: L.Marker;
+  private marcador?: L.Marker;
   private iconoSolicitud!: L.DivIcon;
-  private marcadoresSolicitud = new Map<string, L.Marker>();
-
+  private searchAbort?: AbortController;
+  private searchSequence = 0;
+  private lastGeocodeAt = 0;
   latitudActual = MUNICIPALIDAD_SAN_MIGUEL_COORDS[0];
   longitudActual = MUNICIPALIDAD_SAN_MIGUEL_COORDS[1];
   coordenadasSeleccionadas = false;
-
   codigoSolicitud = '';
   solicitanteNombre = '';
   telefonoSolicitante = '';
   direccionPredio = '';
   origenRuta = 'nueva-solicitud';
   terminoBusqueda = '';
-  resultadosBusqueda: Array<{ display_name: string; lat: string; lon: string }> = [];
-  solicitudes: Solicitud[] = [];
-  solicitudesFiltradas: Solicitud[] = [];
-  solicitudExpandida: string | null = null;
-  solicitudesError = '';
+  resultadosBusqueda: GeoSuggestion[] = [];
   buscando = false;
   mapaMensaje = '';
+  busquedaAmpliada = false;
+  etiquetaPunto = '';
 
-  constructor(
-    private router: Router,
-    private route: ActivatedRoute,
-    private verificacionService: VerificacionService,
-    private zone: NgZone,
-    private changeDetector: ChangeDetectorRef
-  ) {}
+  constructor(private router: Router, private route: ActivatedRoute, private verificacionService: VerificacionService,
+    private zone: NgZone, private changeDetector: ChangeDetectorRef) {}
 
   async ngOnInit(): Promise<void> {
     const qp = this.route.snapshot.queryParamMap;
     this.codigoSolicitud = qp.get('codigo') || qp.get('edit') || '';
     this.origenRuta = qp.get('retorno') || 'nueva-solicitud';
     this.terminoBusqueda = qp.get('q') || '';
-
     if (this.origenRuta === 'expedientes/nuevo') {
       try {
-        const borrador = JSON.parse(sessionStorage.getItem('sm_expediente_nuevo_borrador') || '{}');
-        this.solicitanteNombre = [borrador.nombres, borrador.apellidos].filter(Boolean).join(' ');
-        this.telefonoSolicitante = borrador.telefono || '';
-        this.direccionPredio = borrador.direccion || this.terminoBusqueda;
-        const lat = Number(borrador.latitud), lng = Number(borrador.longitud);
-        if (borrador.latitud !== null && borrador.longitud !== null && Number.isFinite(lat) && Number.isFinite(lng)) {
-          this.latitudActual = lat;
-          this.longitudActual = lng;
+        const draft = JSON.parse(sessionStorage.getItem('sm_expediente_nuevo_borrador') || '{}');
+        this.solicitanteNombre = [draft.nombres, draft.apellidos].filter(Boolean).join(' ');
+        this.telefonoSolicitante = draft.telefono || '';
+        this.direccionPredio = draft.direccion || this.terminoBusqueda;
+        const point = validPoint(Number(draft.latitud), Number(draft.longitud));
+        if (draft.latitud !== null && draft.longitud !== null && point) {
+          [this.latitudActual, this.longitudActual] = point;
           this.coordenadasSeleccionadas = true;
         }
       } catch { /* El mapa puede abrirse aunque el borrador esté vacío. */ }
     } else {
-      const guardada = localStorage.getItem('ubicacionVivienda');
-      if (guardada) {
+      try {
+        const saved = JSON.parse(localStorage.getItem('ubicacionVivienda') || 'null');
+        const point = saved && validPoint(Number(saved.latitud), Number(saved.longitud));
+        if (point) { [this.latitudActual, this.longitudActual] = point; this.coordenadasSeleccionadas = true; }
+      } catch { /* Se conserva el centro institucional. */ }
+      if (this.codigoSolicitud) {
         try {
-          const punto = JSON.parse(guardada);
-          if (punto.latitud && punto.longitud) {
-            this.latitudActual = punto.latitud;
-            this.longitudActual = punto.longitud;
-            this.coordenadasSeleccionadas = true;
-          }
-        } catch {
-          // Fallback a San Miguel
-        }
+          const solicitud = await this.verificacionService.cargarSolicitud(this.codigoSolicitud);
+          this.solicitanteNombre = solicitud.nombre;
+          this.telefonoSolicitante = solicitud.telefono || '';
+          this.direccionPredio = solicitud.direccion || this.terminoBusqueda;
+          const point = validPoint(Number(solicitud.latitud), Number(solicitud.longitud));
+          if (point) { [this.latitudActual, this.longitudActual] = point; this.coordenadasSeleccionadas = true; }
+        } catch { this.mapaMensaje = 'No se pudo consultar la ubicación guardada para esta solicitud.'; }
       }
-    }
-
-    try {
-      this.solicitudes = await this.verificacionService.obtenerSolicitudes();
-      this.solicitudesFiltradas = this.solicitudes;
-      const solicitudActual = this.solicitudes.find(s => s.codigo === this.codigoSolicitud);
-      if (solicitudActual) {
-        this.solicitanteNombre = solicitudActual.nombre;
-        this.telefonoSolicitante = solicitudActual.telefono || '';
-        this.direccionPredio = solicitudActual.direccion;
-        if (this.tieneCoordenadas(solicitudActual)) {
-          this.latitudActual = Number(solicitudActual.latitud);
-          this.longitudActual = Number(solicitudActual.longitud);
-          this.coordenadasSeleccionadas = true;
-        }
-        this.solicitudExpandida = solicitudActual.codigo;
-      }
-      if (this.mapa) {
-        this.pintarMarcadoresSolicitudes();
-        if (solicitudActual && this.tieneCoordenadas(solicitudActual)) {
-          this.mapa.setView([Number(solicitudActual.latitud), Number(solicitudActual.longitud)], 16);
-          this.colocarMarcador(Number(solicitudActual.latitud), Number(solicitudActual.longitud));
-        }
-      }
-    } catch {
-      this.solicitudesError = 'No se pudieron cargar las solicitudes registradas.';
     }
     this.changeDetector.markForCheck();
   }
 
   ngAfterViewInit(): void {
-    // Configurar iconos de Leaflet para evitar problemas de assets perdidos
-    const iconoDefault = L.icon({
+    L.Marker.prototype.options.icon = L.icon({
       iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
       iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
       shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41],
+      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41],
     });
-    L.Marker.prototype.options.icon = iconoDefault;
-
-    this.iconoSolicitud = L.divIcon({
-      className: 'request-map-pin',
-      html: '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44" aria-hidden="true"><path fill="#dc2626" stroke="#fff" stroke-width="2" d="M18 2C9.2 2 2 9.2 2 18c0 10.4 16 24 16 24s16-13.6 16-24C34 9.2 26.8 2 18 2Z"/><circle cx="18" cy="18" r="5" fill="#fff"/></svg>',
-      iconSize: [36, 44],
-      iconAnchor: [18, 43],
-      popupAnchor: [0, -39],
-    });
-
-    // Inicializar mapa centrado en San Miguel
-    this.mapa = L.map('mapa').setView([this.latitudActual, this.longitudActual], 15);
-
+    this.iconoSolicitud = L.divIcon({ className: 'selected-map-pin', html: '<span aria-hidden="true"></span>', iconSize: [30, 38], iconAnchor: [15, 36] });
+    this.mapa = L.map('mapa', { zoomControl: true }).setView([this.latitudActual, this.longitudActual], this.coordenadasSeleccionadas ? 17 : 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap · Municipalidad de San Miguel',
-      maxZoom: 19,
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>', maxZoom: 19,
     }).addTo(this.mapa);
-
-    if (this.coordenadasSeleccionadas) {
-      this.colocarMarcador(this.latitudActual, this.longitudActual);
-    }
-    this.pintarMarcadoresSolicitudes();
-
-    this.mapa.on('click', (evento: L.LeafletMouseEvent) => {
-      this.zone.run(() => {
-        const lat = evento.latlng.lat;
-        const lng = evento.latlng.lng;
-        this.latitudActual = lat;
-        this.longitudActual = lng;
-        this.coordenadasSeleccionadas = true;
-        this.colocarMarcador(lat, lng);
-        this.changeDetector.markForCheck();
-      });
-    });
+    if (this.coordenadasSeleccionadas) this.colocarMarcador(this.latitudActual, this.longitudActual);
+    this.mapa.on('click', event => this.zone.run(() => this.seleccionarPunto(event.latlng.lat, event.latlng.lng)));
+    window.setTimeout(() => this.mapa?.invalidateSize({ pan: false }), 0);
   }
 
-  private colocarMarcador(lat: number, lng: number): void {
-    if (this.marcador) {
-      this.mapa.removeLayer(this.marcador);
-    }
+  private colocarMarcador(lat: number, lon: number): void {
+    this.marcador?.remove();
+    this.marcador = L.marker([lat, lon], { icon: this.iconoSolicitud, draggable: true, title: 'Ubicación del predio' }).addTo(this.mapa);
+    this.marcador.on('dragend', () => this.zone.run(() => {
+      const p = this.marcador!.getLatLng(); this.seleccionarPunto(p.lat, p.lng, false);
+    }));
+    this.actualizarPopup();
+  }
 
+  private actualizarPopup(): void {
+    if (!this.marcador) return;
     const popup = document.createElement('div');
-    popup.style.cssText = 'font-family:Arial,sans-serif;font-size:12px;line-height:1.45;min-width:180px';
-    const title = document.createElement('strong');
-    title.style.color = '#a71919';
-    title.textContent = this.solicitanteNombre || 'Domicilio seleccionado';
-    popup.append(title);
-    if (this.direccionPredio) {
-      const address = document.createElement('div');
-      address.textContent = this.direccionPredio;
-      popup.append(address);
-    }
-    if (this.telefonoSolicitante) {
-      const phone = document.createElement('div');
-      phone.textContent = `Teléfono: ${this.telefonoSolicitante}`;
-      popup.append(phone);
-    }
-    const coords = document.createElement('small');
-    coords.textContent = `Lat: ${lat.toFixed(6)} · Lng: ${lng.toFixed(6)}`;
-    popup.append(coords);
-    this.marcador = L.marker([lat, lng], this.iconoSolicitud ? { icon: this.iconoSolicitud } : {})
-      .addTo(this.mapa)
-      .bindPopup(popup)
-      .openPopup();
+    const title = document.createElement('strong'); title.textContent = this.etiquetaPunto || this.direccionPredio || this.solicitanteNombre || 'Predio seleccionado'; popup.append(title);
+    const coords = document.createElement('div'); coords.textContent = `${this.latitudActual.toFixed(6)}, ${this.longitudActual.toFixed(6)}`; popup.append(coords);
+    this.marcador.bindPopup(popup).openPopup();
   }
 
-  private pintarMarcadoresSolicitudes(): void {
-    if (!this.mapa || !this.iconoSolicitud) return;
-    this.marcadoresSolicitud.forEach(marker => this.mapa.removeLayer(marker));
-    this.marcadoresSolicitud.clear();
-    this.solicitudes.filter(s => this.tieneCoordenadas(s)).forEach(s => {
-      const marker = L.marker([Number(s.latitud), Number(s.longitud)], { icon: this.iconoSolicitud })
-        .addTo(this.mapa)
-        .bindPopup(this.popupSolicitud(s));
-      this.marcadoresSolicitud.set(s.codigo, marker);
-    });
+  private seleccionarPunto(lat: number, lon: number, recenter = true, label = ''): void {
+    const point = validPoint(lat, lon);
+    if (!point) { this.mapaMensaje = 'Las coordenadas deben estar dentro de los rangos geográficos válidos.'; return; }
+    this.searchAbort?.abort(); this.searchSequence++; this.buscando = false; this.resultadosBusqueda = [];
+    [this.latitudActual, this.longitudActual] = point;
+    this.etiquetaPunto = label; this.coordenadasSeleccionadas = true; this.mapaMensaje = '';
+    if (recenter) this.mapa.setView(point, Math.max(this.mapa.getZoom(), 17), { animate: true });
+    this.colocarMarcador(...point); this.changeDetector.markForCheck();
   }
 
-  private popupSolicitud(s: Solicitud): string {
-    const esc = (value: string | null | undefined) => (value || '').replace(/[&<>"']/g, character => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-    }[character] || character));
-    return `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.45;min-width:190px"><strong style="color:#a71919">${esc(s.nombre)}</strong><br><span>${esc(s.direccion || 'Dirección no registrada')}</span>${s.referencia ? `<br><small>Referencia: ${esc(s.referencia)}</small>` : ''}${s.telefono ? `<br><b>Teléfono:</b> ${esc(s.telefono)}` : ''}</div>`;
-  }
-
-  tieneCoordenadas(s: Solicitud): boolean {
-    const lat = Number(s.latitud);
-    const lng = Number(s.longitud);
-    return Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0;
-  }
-
-  enfocarSolicitud(s: Solicitud): void {
-    const marker = this.marcadoresSolicitud.get(s.codigo);
-    if (!marker) {
-      this.mapaMensaje = 'Esta solicitud todavía no tiene una ubicación marcada.';
-      return;
-    }
-    this.mapaMensaje = '';
-    this.mapa.setView([Number(s.latitud), Number(s.longitud)], 17, { animate: true });
-    marker.openPopup();
-  }
-
-  toggleSolicitud(codigo: string): void {
-    this.solicitudExpandida = this.solicitudExpandida === codigo ? null : codigo;
-  }
-
-  private normalizar(texto: string | null | undefined): string {
-    return (texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
-  }
-
-  private pareceDireccion(texto: string): boolean {
-    const normalizada = this.normalizar(texto).trim();
-    if (/^[\d\s+().-]+$/.test(normalizada)) return false;
-    return /\b(jr|jiron|calle|avenida|av|pasaje|psje|prolongacion|carretera|urbanizacion|urb|manzana|mz|lote|lt)\b/.test(normalizada)
-      || /\b(nro|numero|num|n|casa|#)\s*[°º.\-]*\s*\d/.test(normalizada)
-      || /^\d{1,4}\s+/.test(normalizada);
-  }
-
-  async buscarUbicacion(): Promise<void> {
+  async buscarUbicacion(ampliar = false): Promise<void> {
     const q = this.terminoBusqueda.trim();
-    if (!q) {
-      this.solicitudesFiltradas = this.solicitudes;
-      this.resultadosBusqueda = [];
-      this.mapaMensaje = '';
-      this.changeDetector.markForCheck();
-      return;
+    if (!q) return;
+    const coordinates = parseCoordinates(q);
+    if (coordinates) {
+      this.searchAbort?.abort(); this.searchSequence++; this.buscando = false; this.resultadosBusqueda = []; this.busquedaAmpliada = false;
+      this.seleccionarPunto(...coordinates); return;
     }
-    this.buscando = true;
-    this.mapaMensaje = '';
-    this.resultadosBusqueda = [];
-    const busqueda = this.normalizar(q);
-    this.solicitudesFiltradas = this.solicitudes.filter(s =>
-      this.normalizar([s.codigo, s.nombre, s.dni, s.telefono, s.direccion, s.referencia].join(' ')).includes(busqueda)
-    );
-    if (this.solicitudesFiltradas.length) {
-      const ubicadas = this.solicitudesFiltradas.filter(s => this.tieneCoordenadas(s));
-      if (ubicadas.length === 1) {
-        this.enfocarSolicitud(ubicadas[0]);
-      } else if (ubicadas.length > 1) {
-        const puntos = ubicadas.map(s => L.latLng(Number(s.latitud), Number(s.longitud)));
-        this.mapa.fitBounds(L.latLngBounds(puntos), { padding: [36, 36], maxZoom: 16 });
-      } else {
-        this.mapaMensaje = 'Encontré la solicitud, pero todavía no tiene una ubicación marcada.';
-      }
-      this.buscando = false;
-      this.changeDetector.markForCheck();
-      return;
-    }
-
-    if (!this.pareceDireccion(q)) {
-      this.buscando = false;
-      this.mapaMensaje = 'Para buscar un punto en el mapa, escribe un jirón, calle o dirección. La búsqueda por persona se revisa solo en las solicitudes registradas.';
-      this.changeDetector.markForCheck();
-      return;
-    }
-
-    this.solicitudesError = '';
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 10000);
+    if (this.buscando) return;
+    const now = Date.now();
+    if (now - this.lastGeocodeAt < 1100) { this.mapaMensaje = 'Espera un momento antes de volver a consultar el buscador geográfico.'; return; }
+    this.lastGeocodeAt = now; this.searchAbort?.abort();
+    const controller = new AbortController(); this.searchAbort = controller;
+    const sequence = ++this.searchSequence; this.buscando = true; this.mapaMensaje = ''; this.resultadosBusqueda = [];
+    this.busquedaAmpliada = ampliar;
+    const query = ampliar ? q.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim() : normalizedGeocodeQuery(q);
+    const params = new URLSearchParams({ format: 'jsonv2', limit: '6', countrycodes: 'pe', q: query });
+    if (!ampliar) { params.set('viewbox', '-70.20,-15.34,-70.05,-15.52'); params.set('bounded', '0'); }
+    const timeout = window.setTimeout(() => controller.abort(), 12000);
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=pe&q=${encodeURIComponent(q)}`, { headers: { 'Accept-Language': 'es' }, signal: controller.signal });
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, { headers: { 'Accept-Language': 'es' }, referrerPolicy: 'origin', signal: controller.signal });
       if (!response.ok) throw new Error('geocoding');
-      const resultados = await response.json() as Array<{ display_name: string; lat: string; lon: string }>;
+      const raw = await response.json() as GeoSuggestion[];
+      const valid = raw.filter(item => item && typeof item.display_name === 'string' && validPoint(Number(item.lat), Number(item.lon)));
       this.zone.run(() => {
-        this.resultadosBusqueda = resultados;
-        if (!resultados.length) this.mapaMensaje = 'No hay solicitudes que coincidan ni se encontró esa dirección. Prueba con el nombre del jirón o la persona.';
-        this.buscando = false;
-        this.changeDetector.markForCheck();
+        if (sequence !== this.searchSequence) return;
+        this.resultadosBusqueda = valid;
+        if (!valid.length) this.mapaMensaje = 'No se encontraron coincidencias. Prueba con una dirección más completa, una referencia o coordenadas.';
+        this.buscando = false; this.changeDetector.markForCheck();
       });
     } catch {
       this.zone.run(() => {
+        if (sequence !== this.searchSequence) return;
         this.resultadosBusqueda = [];
-        this.mapaMensaje = 'No se pudo consultar la dirección en el mapa. La búsqueda de solicitudes registradas sí está disponible.';
-        this.buscando = false;
-        this.changeDetector.markForCheck();
+        this.mapaMensaje = controller.signal.aborted ? 'La búsqueda se canceló o tardó demasiado. Puedes intentarlo de nuevo.' : 'No se pudo consultar el buscador geográfico. Puedes seleccionar el punto directamente en el mapa.';
+        this.buscando = false; this.changeDetector.markForCheck();
       });
-    } finally {
-      window.clearTimeout(timeout);
-    }
+    } finally { window.clearTimeout(timeout); }
   }
 
-  seleccionarResultado(resultado: { lat: string; lon: string }): void {
-    this.latitudActual = Number(resultado.lat); this.longitudActual = Number(resultado.lon); this.coordenadasSeleccionadas = true;
-    this.mapa.setView([this.latitudActual, this.longitudActual], 17); this.colocarMarcador(this.latitudActual, this.longitudActual); this.resultadosBusqueda = [];
+  seleccionarResultado(result: GeoSuggestion): void {
+    const point = validPoint(Number(result.lat), Number(result.lon));
+    if (!point) { this.mapaMensaje = 'El resultado no contiene coordenadas válidas.'; return; }
+    this.resultadosBusqueda = []; this.seleccionarPunto(point[0], point[1], true, result.display_name);
   }
 
-  async guardarUbicacion(): Promise<void> {
-    if (!this.coordenadasSeleccionadas || !this.marcador) {
-      this.mapaMensaje = 'Selecciona un punto en el mapa antes de confirmar la ubicación.';
-      return;
+  guardarUbicacion(): void {
+    if (!this.coordenadasSeleccionadas || !validPoint(this.latitudActual, this.longitudActual)) {
+      this.mapaMensaje = 'Selecciona un punto en el mapa antes de confirmar la ubicación.'; return;
     }
-    this.mapaMensaje = '';
-
-    const payload = {
-      latitud: this.latitudActual,
-      longitud: this.longitudActual,
-    };
-
+    const payload = { latitud: this.latitudActual, longitud: this.longitudActual };
     localStorage.setItem('sm_temp_ubicacion_mapa', JSON.stringify(payload));
     if (this.origenRuta !== 'expedientes/nuevo') localStorage.setItem('ubicacionVivienda', JSON.stringify(payload));
-
     if (this.origenRuta === 'expedientes/nuevo') this.router.navigate(['/expedientes/nuevo']);
     else this.router.navigate(this.codigoSolicitud ? ['/nueva-solicitud', this.codigoSolicitud] : ['/nueva-solicitud']);
   }
 
   volver(): void {
     if (this.origenRuta === 'expedientes/nuevo') { this.router.navigate(['/expedientes/nuevo']); return; }
-    if (this.codigoSolicitud) {
-      this.router.navigate(['/nueva-solicitud', this.codigoSolicitud]);
-    } else {
-      this.router.navigate(['/nueva-solicitud']);
-    }
+    this.router.navigate(this.codigoSolicitud ? ['/nueva-solicitud', this.codigoSolicitud] : ['/nueva-solicitud']);
   }
 
-  ngOnDestroy(): void {
-    if (this.mapa) {
-      this.mapa.remove();
-    }
-  }
+  ngOnDestroy(): void { this.searchAbort?.abort(); this.mapa?.remove(); }
 }
 export { MapaComponent as Mapa };

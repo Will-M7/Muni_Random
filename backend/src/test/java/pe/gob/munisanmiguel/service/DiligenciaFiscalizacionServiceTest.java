@@ -74,10 +74,27 @@ class DiligenciaFiscalizacionServiceTest {
         assertNull(captor.getValue().getLatitudInicio());assertNull(captor.getValue().getLongitudInicio());
     }
 
-    @Test void evitaUnSegundoInicioSobreLaProgramacionEnCurso(){
+    @Test void segundoInicioDevuelveLaDiligenciaExistenteSinDuplicarla(){
         var f=fixture();f.programacion.setEstadoProgramacion(EstadoProgramacion.EN_CURSO);
-        assertThrows(ConflictException.class,()->f.service.iniciar(20L,new InicioDiligenciaRequest(EstadoGps.NO_DISPONIBLE,null,null),"fiscalizador"));
-        verify(f.diligences,never()).saveAndFlush(any());
+        var existing=new DiligenciaFiscalizacion();existing.setId(31L);existing.setProgramacion(f.programacion);existing.setExpediente(f.expediente);
+        existing.setFiscalizadorResponsable(f.fiscalizador);existing.setFechaInicio(java.time.LocalDateTime.now(java.time.ZoneId.of("America/Lima")));
+        existing.setEstado(EstadoDiligencia.EN_DESARROLLO);existing.setGpsInicioEstado(EstadoGps.NO_DISPONIBLE);existing.setGpsCierreEstado(EstadoGps.NO_DISPONIBLE);
+        existing.setSituacionPersona(SituacionPersona.PENDIENTE);existing.setMedioEntrega(MedioEntrega.PENDIENTE);
+        when(f.diligences.findByProgramacionId(20L)).thenReturn(Optional.of(existing));
+        var result=f.service.iniciar(20L,new InicioDiligenciaRequest(EstadoGps.NO_DISPONIBLE,null,null),"fiscalizador");
+        assertEquals(31L,result.id());assertEquals("EN_DESARROLLO",result.estadoDiligencia());
+        verify(f.diligences,never()).saveAndFlush(any());verifyNoInteractions(f.history);
+    }
+
+    @Test void gpsDeInicioEsVoluntarioYDebePedirseEnUnaAccionSeparada(){
+        var f=fixture();var diligence=new DiligenciaFiscalizacion();diligence.setId(31L);diligence.setProgramacion(f.programacion);
+        diligence.setExpediente(f.expediente);diligence.setFiscalizadorResponsable(f.fiscalizador);diligence.setFechaInicio(java.time.LocalDateTime.now(java.time.ZoneId.of("America/Lima")));
+        diligence.setEstado(EstadoDiligencia.INICIADA);diligence.setGpsInicioEstado(EstadoGps.NO_DISPONIBLE);diligence.setGpsCierreEstado(EstadoGps.NO_DISPONIBLE);
+        diligence.setSituacionPersona(SituacionPersona.PENDIENTE);diligence.setMedioEntrega(MedioEntrega.PENDIENTE);
+        when(f.diligences.findByIdForUpdate(31L)).thenReturn(Optional.of(diligence));
+        var result=f.service.registrarGpsInicio(31L,new InicioDiligenciaRequest(EstadoGps.DISPONIBLE,new BigDecimal("-12.1"),new BigDecimal("-77.2")),"fiscalizador");
+        assertEquals("DISPONIBLE",result.gpsInicioEstado());assertEquals(new BigDecimal("-12.1"),diligence.getLatitudInicio());
+        verify(f.history).save(argThat(h->h.getTipoEvento().equals("GPS_INICIO_REGISTRADO")));
     }
 
     @Test void inicioDespuesDelDiaProgramadoNoModificaElEstadoHistorico(){
@@ -153,8 +170,76 @@ class DiligenciaFiscalizacionServiceTest {
     @Test void archivoDeDiligenciaAjenaEsDenegadoAntesDeLeerDisco(){
         var f=fixture();var d=new DiligenciaFiscalizacion();d.setId(30L);d.setProgramacion(f.programacion);
         var e=new EvidenciaFiscalizacion();e.setId(40L);e.setDiligencia(d);e.setNombreInterno("archivo.pdf");
-        when(f.evidences.findByIdAndDiligenciaId(40L,30L)).thenReturn(Optional.of(e));
+        when(f.evidences.findByIdAndDiligenciaIdAndRetiradoEnIsNull(40L,30L)).thenReturn(Optional.of(e));
         assertThrows(AccessDeniedException.class,()->f.service.evidencia(30L,40L,"otro",true));
+        verifyNoInteractions(f.storage);
+    }
+
+    @Test void finalizarSinHechosAvanzaHastaLasValidacionesDePersonaYNoExigeTexto(){
+        var f=fixture();f.programacion.setEstadoProgramacion(EstadoProgramacion.EN_CURSO);
+        var d=new DiligenciaFiscalizacion();d.setId(30L);d.setProgramacion(f.programacion);d.setExpediente(f.expediente);
+        d.setFiscalizadorResponsable(f.fiscalizador);d.setEstado(EstadoDiligencia.EN_DESARROLLO);
+        d.setFechaInicio(java.time.LocalDateTime.now(java.time.ZoneId.of("America/Lima")));
+        d.setSituacionPersona(SituacionPersona.PENDIENTE);d.setHechosConstatados(null);
+        when(f.diligences.findByIdForUpdate(30L)).thenReturn(Optional.of(d));
+        var request=new pe.gob.munisanmiguel.dto.ApiDtos.FinalizarDiligenciaRequest(null,null,false,null,EstadoGps.NO_DISPONIBLE,null,null);
+        var error=assertThrows(ConflictException.class,()->f.service.finalizar(30L,request,"fiscalizador"));
+        assertTrue(error.getMessage().contains("Indica quién atendió"));
+        verify(f.actas,never()).saveAndFlush(any());
+    }
+
+    @Test void anexoPosteriorAlCierreNoPermiteUnSegundoArchivo(){
+        var f=fixture();var closed=java.time.LocalDateTime.now(java.time.ZoneId.of("America/Lima")).minusHours(1);
+        var d=new DiligenciaFiscalizacion();d.setId(30L);d.setProgramacion(f.programacion);d.setEstado(EstadoDiligencia.FINALIZADA);d.setFechaCierre(closed);
+        var existing=new EvidenciaFiscalizacion();existing.setDiligencia(d);existing.setFechaHora(closed.plusMinutes(1));
+        when(f.diligences.findByIdForUpdate(30L)).thenReturn(Optional.of(d));
+        when(f.evidences.findAllByDiligenciaIdOrderByFechaHoraAscIdAsc(30L)).thenReturn(List.of(existing));
+        assertThrows(ConflictException.class,()->f.service.agregarEvidencia(30L,TipoEvidencia.PDF,"Anexo",null,"fiscalizador"));
+        verifyNoInteractions(f.storage);
+        verify(f.actas,never()).save(any());
+    }
+
+    @Test void permiteUnAnexoPdfTrazableSinModificarElActaFinalizada(){
+        var f=fixture();var closed=java.time.LocalDateTime.now(java.time.ZoneId.of("America/Lima")).minusHours(1);
+        var d=new DiligenciaFiscalizacion();d.setId(30L);d.setProgramacion(f.programacion);d.setExpediente(f.expediente);
+        d.setEstado(EstadoDiligencia.FINALIZADA);d.setFechaCierre(closed);
+        when(f.diligences.findByIdForUpdate(30L)).thenReturn(Optional.of(d));
+        var file=mock(org.springframework.web.multipart.MultipartFile.class);when(file.isEmpty()).thenReturn(false);when(file.getOriginalFilename()).thenReturn("anexo.pdf");
+        when(f.storage.storeEvidence(file,false)).thenReturn(new FiscalizacionFileStorageService.StoredFile("anexo.pdf","stored.pdf","application/pdf",123));
+        when(f.evidences.save(any())).thenAnswer(i->{var saved=(EvidenciaFiscalizacion)i.getArgument(0);saved.setId(77L);return saved;});
+        var response=f.service.agregarEvidencia(30L,TipoEvidencia.PDF,"Anexo adicional del acta",file,"fiscalizador");
+        assertEquals(77L,response.id());assertEquals("fiscalizador",response.autor());assertNotNull(response.fechaHora());
+        verify(f.history).save(argThat(h->h.getTipoEvento().equals("ANEXO_ACTA_AGREGADO")));
+        verify(f.actas,never()).save(any());
+    }
+
+    @Test void retiraEvidenciaPropiaEditableSinEliminarArchivoYRegistraMotivo(){
+        var f=fixture();var d=new DiligenciaFiscalizacion();d.setId(30L);d.setProgramacion(f.programacion);d.setExpediente(f.expediente);d.setEstado(EstadoDiligencia.EN_DESARROLLO);
+        var e=new EvidenciaFiscalizacion();e.setId(40L);e.setDiligencia(d);e.setNombreOriginal("equivocado.pdf");e.setNombreInterno("conservado.pdf");
+        when(f.diligences.findByIdForUpdate(30L)).thenReturn(Optional.of(d));
+        when(f.evidences.findByIdAndDiligenciaIdAndRetiradoEnIsNull(40L,30L)).thenReturn(Optional.of(e));
+        f.service.retirarEvidencia(30L,40L,"Archivo equivocado","fiscalizador");
+        assertNotNull(e.getRetiradoEn());assertEquals(f.actor,e.getRetiradoPor());assertEquals("Archivo equivocado",e.getMotivoRetiro());
+        verify(f.evidences).save(e);verify(f.history).save(argThat(h->h.getTipoEvento().equals("EVIDENCIA_RETIRADA")));
+        verify(f.storage,never()).delete(any());
+    }
+
+    @Test void noPermiteRetirarEvidenciaFinalizadaNiDeOtroFiscalizador(){
+        var f=fixture();var d=new DiligenciaFiscalizacion();d.setId(30L);d.setProgramacion(f.programacion);d.setExpediente(f.expediente);d.setEstado(EstadoDiligencia.FINALIZADA);
+        when(f.diligences.findByIdForUpdate(30L)).thenReturn(Optional.of(d));
+        assertThrows(ConflictException.class,()->f.service.retirarEvidencia(30L,40L,"Error","fiscalizador"));
+        d.setEstado(EstadoDiligencia.EN_DESARROLLO);
+        assertThrows(AccessDeniedException.class,()->f.service.retirarEvidencia(30L,40L,"Error","otro"));
+        verify(f.evidences,never()).save(any());verifyNoInteractions(f.storage);
+    }
+
+    @Test void rechazaFormatoYTamanoDeEvidenciaAntesDeEscribirArchivo(){
+        var f=fixture();var d=new DiligenciaFiscalizacion();d.setId(30L);d.setProgramacion(f.programacion);d.setEstado(EstadoDiligencia.EN_DESARROLLO);
+        when(f.diligences.findByIdForUpdate(30L)).thenReturn(Optional.of(d));
+        var exe=mock(org.springframework.web.multipart.MultipartFile.class);when(exe.getOriginalFilename()).thenReturn("inseguro.exe");
+        assertThrows(ConflictException.class,()->f.service.agregarEvidencia(30L,TipoEvidencia.DOCUMENTO,"",exe,"fiscalizador"));
+        var oversized=mock(org.springframework.web.multipart.MultipartFile.class);when(oversized.getSize()).thenReturn(10L*1024*1024+1);
+        assertThrows(ConflictException.class,()->f.service.agregarEvidencia(30L,TipoEvidencia.PDF,"",oversized,"fiscalizador"));
         verifyNoInteractions(f.storage);
     }
 

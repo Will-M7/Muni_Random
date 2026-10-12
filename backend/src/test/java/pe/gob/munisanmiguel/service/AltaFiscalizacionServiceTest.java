@@ -31,7 +31,9 @@ class AltaFiscalizacionServiceTest {
         doThrow(new ConflictException("Fiscalizador ocupado")).when(f.expedientes).programar(eq("FIS-TEST"),eq(programacion),eq("municipio"));
         assertThrows(ConflictException.class,()->f.service.crear(f.request(programacion),
                 List.of(new MockMultipartFile("documentos","orden.pdf","application/pdf",new byte[]{1})),"municipio"));
-        verifyNoInteractions(f.documentos,f.storage);
+        verify(f.storage).validateDocumentBatch(anyList());
+        verify(f.storage,never()).storeEvidence(any(),anyBoolean());
+        verifyNoInteractions(f.documentos);
     }
 
     @Test void solicitudExternaRepetidaNoAbreOtroExpediente(){
@@ -62,7 +64,9 @@ class AltaFiscalizacionServiceTest {
     @Test void adjuntoPosteriorRechazaExpedienteCerrado(){
         var f=new Fixture();f.expediente.setEstado(EstadoExpediente.CERRADO);
         assertThrows(ConflictException.class,()->f.service.adjuntar("FIS-TEST",List.of(new MockMultipartFile("documentos","x.pdf","application/pdf",new byte[]{1})),"municipio"));
-        verifyNoInteractions(f.storage,f.documentos);
+        verify(f.storage).validateDocumentBatch(anyList());
+        verify(f.storage,never()).storeEvidence(any(),anyBoolean());
+        verifyNoInteractions(f.documentos);
     }
 
     @Test void adjuntoPosteriorRegistraAutorYNoSobrescribe(){
@@ -75,7 +79,29 @@ class AltaFiscalizacionServiceTest {
         try{
             f.service.adjuntar("FIS-TEST",List.of(file),"municipio");
             verify(f.documentos).save(argThat(d->d.getAdjuntadoPor()==user&&d.getAdjuntadoEn()!=null&&"uuid.pdf".equals(d.getNombreInterno())));
+            verify(f.historial).save(argThat(h->h.getTipoEvento().equals("DOCUMENTO_ADJUNTADO")&&h.getActor()==user));
         }finally{TransactionSynchronizationManager.clearSynchronization();}
+    }
+
+    @Test void actaMunicipalUsaElMismoHistorialSinReemplazarDocumentos(){
+        var f=new Fixture();f.expediente.setEstado(EstadoExpediente.ABIERTO);
+        var user=new AppUser();user.setUsername("municipio");
+        when(f.users.findByUsernameIgnoreCaseAndActivoTrue("municipio")).thenReturn(Optional.of(user));
+        var file=new MockMultipartFile("actas","acta-externa.pdf","application/pdf",new byte[]{1});
+        when(f.storage.storeEvidence(file,false)).thenReturn(new FiscalizacionFileStorageService.StoredFile("acta-externa.pdf","acta-uuid.pdf","application/pdf",1));
+        TransactionSynchronizationManager.initSynchronization();
+        try{
+            f.service.adjuntarActas("FIS-TEST",List.of(file),"municipio");
+            verify(f.documentos).save(argThat(d->"ACTA_ADJUNTA".equals(d.getCategoria())&&d.getAdjuntadoPor()==user));
+            verify(f.historial).save(argThat(h->h.getTipoEvento().equals("ACTA_ADJUNTA_SUBIDA")&&h.getFechaHora()!=null));
+            verify(f.documentos,never()).delete(any());
+        }finally{TransactionSynchronizationManager.clearSynchronization();}
+    }
+
+    @Test void actaMunicipalRechazaFormatoDistintoDePdf(){
+        var f=new Fixture();var file=new MockMultipartFile("actas","imagen.png","image/png",new byte[]{1});
+        assertThrows(ConflictException.class,()->f.service.adjuntarActas("FIS-TEST",List.of(file),"municipio"));
+        verify(f.storage,never()).storeEvidence(any(),anyBoolean());
     }
 
     private static class Fixture {
@@ -84,10 +110,11 @@ class AltaFiscalizacionServiceTest {
         final ExpedienteDocumentoRepository documentos=mock(ExpedienteDocumentoRepository.class);
         final FiscalizacionFileStorageService storage=mock(FiscalizacionFileStorageService.class);
         final AppUserRepository users=mock(AppUserRepository.class);
+        final ExpedienteHistorialRepository historial=mock(ExpedienteHistorialRepository.class);
         final ExpedienteFiscalizacion expediente=new ExpedienteFiscalizacion();
         final ExpedienteResponse response=new ExpedienteResponse(null,"FIS-TEST",null,null,null,null,null,null,
                 null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,List.of(),List.of());
-        final AltaFiscalizacionService service=new AltaFiscalizacionService(expedientes,repository,documentos,storage,users);
+        final AltaFiscalizacionService service=new AltaFiscalizacionService(expedientes,repository,documentos,storage,users,historial);
         Fixture(){when(expedientes.crear(any(),eq("municipio"))).thenReturn(response);
             when(repository.findByCodigo("FIS-TEST")).thenReturn(Optional.of(expediente));
             when(expedientes.obtener("FIS-TEST")).thenReturn(response);}

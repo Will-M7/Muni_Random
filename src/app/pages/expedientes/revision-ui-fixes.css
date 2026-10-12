@@ -1,8 +1,649 @@
-.clarification-state{margin-left:6px}
-.inline-actions{display:flex;gap:8px;flex-wrap:wrap}
+.clarification-state{margin-left:6px;font-weight:750;color:#0f6b48}
+.inline-actions{display:flex;gap:10px;flex-wrap:wrap}
 .inline-actions button{white-space:nowrap}
 .field-hint{font-size:11px;font-weight:500;line-height:1.4;color:#68776d}
 .conclusion-form .field-hint{grid-column:1/-1}
 .conclusion-form .check .field-hint{flex-basis:100%}
 @media(max-width:480px){.inline-actions{width:100%}.inline-actions button{flex:1}}
 .daily-summary{margin:22px 0;padding:20px;background:#fff;border:1px solid #e0e9e5;border-radius:16px}.daily-summary h2{margin:0 0 5px;font-size:20px}.daily-summary p{color:#63766d}.daily-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}.daily-card{display:grid;gap:5px;text-align:left;padding:16px;border:1px solid #dce9e2;border-left:5px solid #20945e;border-radius:12px;background:#f7fcf9;color:#20382d;cursor:pointer}.daily-card.yellow{border-left-color:#d39b22;background:#fffaf0}.daily-card.red{border-left-color:#c84242;background:#fff5f4}.daily-card.selected{outline:2px solid #246b50}.daily-card small{line-height:1.5;color:#53675d}
+
+/* ==========================================================================
+   REVISIÓN DE FISCALIZACIÓN (/revisiones/:id) - IDENTIDAD MUNICIPAL SAN MIGUEL
+   ========================================================================== */
+
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.review-page {
+  max-width: 1440px !important;
+  min-height: calc(100vh - 56px);
+  margin: 0 auto;
+  padding: 24px clamp(18px, 3.8vw, 64px) 72px;
+  box-sizing: border-box;
+  background:
+    linear-gradient(180deg, rgba(242, 246, 243, 0.45) 0%, rgba(242, 246, 243, 0.88) 320px, #f2f6f3 100%),
+    url('/assets/imagenes/municipalidad-san-miguel.png') top center / 100% auto no-repeat fixed;
+  color: #12382e;
+}
+
+.review-page .back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 14px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(206, 227, 215, 0.95);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #086d4e;
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(18, 60, 38, 0.06);
+  backdrop-filter: blur(5px);
+  transition: all 0.16s ease;
+}
+
+.review-page .back svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  transition: transform 0.16s ease;
+}
+
+.review-page .back:hover {
+  background: #edf6f0;
+  border-color: #b5d7c0;
+  color: #06533b;
+  transform: translateX(-2px);
+}
+
+.review-page .back:focus-visible {
+  outline: 3px solid rgba(7, 140, 42, 0.35);
+  outline-offset: 2px;
+}
+
+/* Encabezado / Hero con municipalidad-san-miguel.png */
+.review-page .page-head {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding: 28px 34px;
+  border: 1px solid #d4e4db;
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 251, 248, 0.95) 48%, rgba(240, 248, 243, 0.78) 75%, rgba(240, 248, 243, 0.3) 100%),
+    url('/assets/imagenes/municipalidad-san-miguel.png') center right / cover no-repeat;
+  box-shadow: 0 8px 26px rgba(17, 57, 39, 0.08);
+}
+
+.review-page .detail-origin {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(210, 230, 218, 0.9);
+  border-radius: 20px;
+  background: rgba(244, 251, 246, 0.92);
+  color: #a1782a;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.review-page .detail-origin i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #b28a43;
+  box-shadow: 0 0 0 3px #f5eccf;
+}
+
+.review-page .page-head h1 {
+  margin: 4px 0 6px;
+  color: #07382b;
+  font-size: clamp(26px, 2.7vw, 36px);
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: -0.8px;
+}
+
+.review-page .page-head p {
+  margin: 0;
+  color: #53695d;
+  font-size: 14px;
+  max-width: 720px;
+  line-height: 1.45;
+}
+
+.review-page .page-head .pill {
+  flex: none;
+  border-radius: 999px;
+  background: #e2f4e8;
+  color: #086d43;
+  border: 1px solid #b6e4c8;
+  padding: 9px 20px;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  box-shadow: 0 2px 8px rgba(8, 109, 67, 0.12);
+  white-space: nowrap;
+}
+
+.review-page .page-head .pill.done {
+  background: #d8f3e3;
+  color: #087044;
+  border-color: #a2dab8;
+}
+
+/* Tarjetas y paneles */
+.review-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin: 20px 0;
+}
+
+.review-detail-grid > .panel {
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #dce8df;
+  border-radius: 16px;
+  padding: 24px 26px;
+  box-shadow: 0 5px 20px rgba(17, 52, 35, 0.06);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.review-detail-grid > .panel:hover {
+  border-color: #cbdcd0;
+  box-shadow: 0 8px 25px rgba(17, 52, 35, 0.09);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e6eee8;
+}
+
+.panel-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 12px;
+  background: #e5f4ea;
+  color: #08784d;
+}
+
+.panel-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.review-detail-grid h2 {
+  margin: 0;
+  color: #0f3d2f;
+  font-size: 1.16rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+
+.panel-subtitle {
+  margin: -6px 0 16px;
+  color: #63776b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Grid de datos (dl) */
+.review-detail-grid dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin: 0;
+}
+
+.review-detail-grid dl .wide {
+  grid-column: 1 / -1;
+}
+
+.review-detail-grid dl div {
+  min-width: 0;
+  padding: 11px 14px;
+  border: 1px solid #e6efe8;
+  border-radius: 10px;
+  background: #f9fbf9;
+  display: grid;
+  gap: 4px;
+  transition: background 0.15s ease;
+}
+
+.review-detail-grid dl div:hover {
+  background: #f4f8f5;
+}
+
+.review-detail-grid dt {
+  color: #61786c;
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.review-detail-grid dd {
+  margin: 0;
+  color: #17382a;
+  font-size: 0.91rem;
+  font-weight: 650;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.review-detail-grid dd.preserve {
+  white-space: pre-wrap;
+  background: #ffffff;
+  padding: 10px 12px;
+  border: 1px solid #e0ebe3;
+  border-left: 3px solid #1f8253;
+  border-radius: 8px;
+  margin-top: 4px;
+  color: #243d31;
+  font-weight: 500;
+  line-height: 1.55;
+  font-size: 0.88rem;
+}
+
+/* Participantes */
+.participants {
+  border-top: 1px solid #e6ede8;
+  margin-top: 18px;
+  padding-top: 15px;
+}
+
+.participants h3 {
+  font-size: 0.92rem;
+  font-weight: 750;
+  color: #184c37;
+  margin: 0 0 10px;
+}
+
+.participants p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 7px 0;
+  padding: 9px 13px;
+  border: 1px solid #e5eee8;
+  border-radius: 9px;
+  background: #f8faf8;
+  font-size: 0.87rem;
+  color: #203a2e;
+  font-weight: 600;
+}
+
+.participants small {
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: #e8f4ec;
+  color: #176340;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+/* Evidencias */
+.evidence-list {
+  display: grid;
+  gap: 10px;
+}
+
+.evidence-list article {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border: 1px solid #dce8df;
+  border-radius: 12px;
+  background: #fafdfa;
+  box-shadow: 0 2px 7px rgba(18, 54, 36, 0.03);
+  transition: all 0.15s ease;
+}
+
+.evidence-list article:hover {
+  border-color: #b7d8c1;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(18, 54, 36, 0.06);
+}
+
+.evidence-list strong {
+  color: #103c2d;
+  font-size: 0.93rem;
+  font-weight: 750;
+}
+
+.evidence-list p {
+  margin: 4px 0;
+  color: #556c5e;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.evidence-list small {
+  color: #728479;
+  font-size: 0.77rem;
+}
+
+.empty-text {
+  padding: 20px;
+  text-align: center;
+  color: #718478;
+  font-size: 0.88rem;
+  background: #f8faf8;
+  border: 1px dashed #cdd9cf;
+  border-radius: 10px;
+  margin: 0;
+}
+
+/* Acta de fiscalización */
+.acta-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 16px 20px;
+  border: 1px solid #dce7df;
+  border-radius: 12px;
+  background: #f7faf8;
+  margin-top: 10px;
+}
+
+.acta-summary strong {
+  font-size: 1.05rem;
+  color: #0c3829;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.acta-summary span {
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: #e6f4ec;
+  color: #15623e;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+/* Botones dentro del espacio de revisión */
+.review-detail-grid .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 20px;
+  border: 1px solid #087c56;
+  border-radius: 9px;
+  background: #087c56;
+  color: #ffffff;
+  font-weight: 750;
+  font-size: 0.88rem;
+  box-shadow: 0 3px 9px rgba(8, 124, 86, 0.22);
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.review-detail-grid .btn-primary:hover:not(:disabled) {
+  background: #066949;
+  border-color: #066949;
+  box-shadow: 0 5px 14px rgba(8, 124, 86, 0.3);
+  transform: translateY(-1px);
+}
+
+.review-detail-grid .btn-primary:focus-visible {
+  outline: 3px solid rgba(7, 140, 42, 0.35);
+  outline-offset: 2px;
+}
+
+.review-detail-grid .btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.review-detail-grid .btn-light,
+.evidence-list .btn-light {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 15px;
+  border: 1px solid #c5dbcc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #14593c;
+  font-weight: 700;
+  font-size: 0.84rem;
+  box-shadow: 0 2px 5px rgba(18, 54, 36, 0.05);
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.review-detail-grid .btn-light:hover:not(:disabled),
+.evidence-list .btn-light:hover:not(:disabled) {
+  background: #edf6f0;
+  border-color: #a7cdb4;
+  color: #0c482e;
+  box-shadow: 0 3px 8px rgba(18, 54, 36, 0.09);
+  transform: translateY(-1px);
+}
+
+.review-detail-grid .btn-light:focus-visible,
+.evidence-list .btn-light:focus-visible {
+  outline: 3px solid rgba(7, 140, 42, 0.3);
+  outline-offset: 2px;
+}
+
+.review-detail-grid .btn-light:disabled,
+.evidence-list .btn-light:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.review-detail-grid .review-file-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  margin-top: 14px;
+  padding: 9px 16px;
+  border: 1px solid #c2dbcb;
+  border-radius: 9px;
+  background: #f4faf6;
+  color: #14593b;
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+  transition: all 0.16s ease;
+}
+
+.review-detail-grid .review-file-link:hover {
+  background: #e6f4ec;
+  border-color: #a4ccb2;
+  color: #0b492f;
+  transform: translateY(-1px);
+}
+
+.review-detail-grid .review-file-link:focus-visible {
+  outline: 3px solid #94c5ab;
+  outline-offset: 2px;
+}
+
+/* Aclaraciones */
+.clarification {
+  padding: 14px 18px;
+  border: 1px solid #e1ebe3;
+  border-radius: 11px;
+  background: #fbfdfb;
+  margin-bottom: 12px;
+}
+
+.clarification b {
+  color: #124331;
+}
+
+.inline-form {
+  margin-top: 18px;
+  padding: 18px 20px;
+  border: 1px solid #dce8df;
+  border-radius: 13px;
+  background: #f7faf8;
+}
+
+.inline-form label {
+  display: grid;
+  gap: 7px;
+  color: #385143;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.inline-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cadad0;
+  border-radius: 9px;
+  padding: 10px 13px;
+  background: #ffffff;
+  color: #21382c;
+  font: inherit;
+  font-size: 0.88rem;
+  resize: vertical;
+}
+
+.inline-form textarea:focus {
+  border-color: #087c56;
+  outline: 3px solid rgba(8, 124, 86, 0.18);
+}
+
+/* Formulario de conclusión */
+.conclusion-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 16px 0;
+  padding: 20px 22px;
+  border: 1px solid #dbe8df;
+  border-radius: 14px;
+  background: #f8faf8;
+}
+
+.conclusion-form label {
+  display: grid;
+  gap: 6px;
+  color: #385143;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.conclusion-form input,
+.conclusion-form select,
+.conclusion-form textarea {
+  border: 1px solid #cbdad0;
+  border-radius: 9px;
+  padding: 10px 12px;
+  background: #ffffff;
+  color: #213a2e;
+  font: inherit;
+  font-size: 0.88rem;
+  transition: border-color 0.15s ease;
+}
+
+.conclusion-form input:focus,
+.conclusion-form select:focus,
+.conclusion-form textarea:focus {
+  border-color: #087c56;
+  outline: 3px solid rgba(8, 124, 86, 0.18);
+}
+
+.conclusion-form .check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid #d8e5dc;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #254032;
+}
+
+.conclusion-form .check input {
+  width: 17px;
+  height: 17px;
+  accent-color: #087c56;
+  cursor: pointer;
+}
+
+.load-note {
+  margin: 12px 0 6px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #eef7f1;
+  color: #19583b;
+  font-size: 0.84rem;
+  font-weight: 650;
+  border: 1px solid #cee5d7;
+}
+
+.review-detail-grid .evidence-list button,
+.review-detail-grid .acta-summary button {
+  white-space: nowrap;
+}
+
+@media(max-width: 960px) {
+  .review-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .review-page .page-head {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 24px;
+  }
+}
+
+@media(max-width: 540px) {
+  .review-detail-grid dl {
+    grid-template-columns: 1fr;
+  }
+  .conclusion-form {
+    grid-template-columns: 1fr;
+  }
+  .conclusion-form .wide {
+    grid-column: 1;
+  }
+  .evidence-list article {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .acta-summary {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -1,0 +1,91 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:?Defina DB_NAME}
+      MYSQL_USER: ${DB_USER:?Defina DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - mysql_prod_data:/var/lib/mysql
+    networks:
+      - private
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u \"$$MYSQL_USER\" --password=\"$$MYSQL_PASSWORD\" -D \"$$MYSQL_DATABASE\" -Nse 'SELECT 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 40s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "false"
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration,classpath:db/production
+      MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+      MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE: readinessState,db
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:?Defina DB_NAME}
+      DB_USER: ${DB_USER:?Defina DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET}
+      IDENTITY_MASTER_KEY: ${IDENTITY_MASTER_KEY:?Defina IDENTITY_MASTER_KEY}
+      ADMIN_BOOTSTRAP_USERNAME: ${ADMIN_BOOTSTRAP_USERNAME:?Defina ADMIN_BOOTSTRAP_USERNAME}
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:?Defina ADMIN_BOOTSTRAP_PASSWORD}
+      CORS_ORIGINS: ${CORS_ORIGINS:?Defina CORS_ORIGINS}
+      APP_STORAGE_PATH: /app/uploads/solicitudes
+      APP_DILIGENCIAS_PATH: /app/uploads/diligencias
+    volumes:
+      - uploads_prod_data:/app/uploads
+    networks:
+      - private
+      - egress
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${APP_BIND_IP:-127.0.0.1}:${HTTPS_PORT:-8443}:443"
+    volumes:
+      - type: bind
+        source: ${TLS_CERT_PATH:?Defina TLS_CERT_PATH}
+        target: /etc/nginx/tls/tls.crt
+        read_only: true
+      - type: bind
+        source: ${TLS_KEY_PATH:?Defina TLS_KEY_PATH}
+        target: /etc/nginx/tls/tls.key
+        read_only: true
+    networks:
+      - private
+      - edge
+
+networks:
+  private:
+    internal: true
+  egress: {}
+  edge: {}
+
+volumes:
+  mysql_prod_data:
+  uploads_prod_data:

@@ -12,7 +12,6 @@ import pe.gob.munisanmiguel.exception.NotFoundException;
 import pe.gob.munisanmiguel.repository.*;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -181,62 +180,59 @@ public class ExpedienteFiscalizacionService {
         var visits=programaciones.findAllByFiscalizadorIdAndEstadoProgramacionInOrderByFechaAscHoraAsc(
                 user.getFiscalizador().getId(),List.of(EstadoProgramacion.PROGRAMADA,EstadoProgramacion.VENCIDA,EstadoProgramacion.EN_CURSO))
                 .stream().filter(p->date.equals(p.getFecha())).sorted(Comparator.comparing(ProgramacionFiscalizacion::getHora)).toList();
-        StringBuilder rows=new StringBuilder();
-        for(var p:visits){
-            var e=p.getExpediente();String address=Objects.toString(e.getDireccionFiscalizada(),"").trim();
-            boolean coordinates=validCoordinates(e.getLatitud(),e.getLongitud());
-            String maps=coordinates?"https://www.google.com/maps/search/?api=1&query="+e.getLatitud()+","+e.getLongitud()
-                    :address.isBlank()?null:"https://www.google.com/maps/search/?api=1&query="+URLEncoder.encode(address,StandardCharsets.UTF_8);
-            String location=coordinates?escape(e.getLatitud()+", "+e.getLongitud()):address.isBlank()?"<strong>Sin ubicación suficiente</strong>":"Sin coordenadas; se usará la dirección";
-            rows.append("<tr data-id=\"").append(p.getId()).append("\" data-lat=\"")
-                    .append(coordinates?e.getLatitud():"").append("\" data-lon=\"")
-                    .append(coordinates?e.getLongitud():"").append("\"><td>")
-                    .append(escape(p.getFecha().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))).append("</td><td>")
-                    .append(escape(p.getHora().format(DateTimeFormatter.ofPattern("HH:mm"))))
-                    .append("<br><small>").append(escape(horaDoce(p.getHora()))).append("</small></td><td><strong>")
-                    .append(escape(e.getCodigo())).append("</strong></td><td>").append(escape(e.getObjetoFiscalizacion()))
-                    .append("</td><td>").append(escape(address.isBlank()?"Sin dirección":address)).append("</td><td>")
-                    .append(escape(Objects.toString(e.getReferenciaDomicilio(),"Sin referencia"))).append("</td><td>")
-                    .append(location).append(maps==null?"":"<br><a href=\""+escape(maps)+"\">Abrir Google Maps</a>")
-                    .append("</td><td>").append(escape(p.getEstadoProgramacion().name()))
-                    .append("</td><td><button type=\"button\" data-toggle>Marcar atendida (solo esta guía)</button><br><label>Hora declarada (opcional) <input type=\"time\" data-hour></label><small data-local-state></small></td></tr>");
+        StringBuilder cards=new StringBuilder();
+        for(int i=0;i<visits.size();i++){
+            var p=visits.get(i);var e=p.getExpediente();String address=Objects.toString(e.getDireccionFiscalizada(),"").trim();
+            String destination=validCoordinates(e.getLatitud(),e.getLongitud())?e.getLatitud()+","+e.getLongitud():address;
+            String administrado=String.join(" ",java.util.stream.Stream.of(e.getNombreAdministrado(),e.getAdministradoApellidos()).filter(v->v!=null&&!v.isBlank()).toList());
+            String status=switch(p.getEstadoProgramacion()){
+                case EN_CURSO -> "En curso";case VENCIDA -> "Vencida";default -> "Pendiente";
+            };
+            cards.append("<article class=\"visit-card\" data-destination=\"").append(escape(destination)).append("\"><div class=\"visit-top\"><span class=\"visit-number\">")
+                    .append(i+1).append("</span><span class=\"status status-").append(p.getEstadoProgramacion().name().toLowerCase(Locale.ROOT))
+                    .append("\">").append(escape(status)).append("</span></div><p class=\"time\">")
+                    .append(escape(p.getHora().format(DateTimeFormatter.ofPattern("HH:mm")))).append(" · ").append(escape(horaDoce(p.getHora())))
+                    .append("</p><h2>").append(escape(e.getCodigo())).append("</h2><p class=\"administrado\">")
+                    .append(escape(administrado.isBlank()?"Administrado sin identificar":administrado)).append("</p><p class=\"object\">")
+                    .append(escape(e.getObjetoFiscalizacion())).append("</p><dl><dt>Dirección</dt><dd>")
+                    .append(escape(address.isBlank()?"Sin dirección":address)).append("</dd><dt>Referencia</dt><dd>")
+                    .append(escape(Objects.toString(e.getReferenciaDomicilio(),"Sin referencia")))
+                    .append("</dd></dl><div class=\"visit-actions\"><button type=\"button\" data-toggle>Marcar atendida (solo esta guía)</button></div>")
+                    .append("<label class=\"hour-label\">Hora de atención opcional <input type=\"time\" data-hour></label><p data-local-state class=\"local-state\" aria-live=\"polite\"></p></article>");
         }
-        if(visits.isEmpty())rows.append("<tr><td colspan=\"9\">No hay visitas pendientes asignadas para esta fecha.</td></tr>");
-        String guideScript=visits.isEmpty()?"":"""
-                <script>
-                (()=>{
-                  const rows=[...document.querySelectorAll('tr[data-id]')],svg=document.getElementById('local-map');
-                  const ns='http://www.w3.org/2000/svg',route=document.getElementById('route-link'),count=document.getElementById('pending-count');
-                  function point(row){const lat=Number(row.dataset.lat),lon=Number(row.dataset.lon);return row.dataset.lat!==''&&row.dataset.lon!==''&&Number.isFinite(lat)&&Number.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180?{row,lat,lon}:null;}
-                  function render(){const active=rows.filter(row=>row.dataset.attended!=='yes'),points=active.map(point).filter(Boolean);
-                    count.textContent=String(active.length);svg.replaceChildren();
-                    if(points.length){const lats=points.map(p=>p.lat),lons=points.map(p=>p.lon),minLat=Math.min(...lats),maxLat=Math.max(...lats),minLon=Math.min(...lons),maxLon=Math.max(...lons);
-                      points.forEach((p,i)=>{const x=40+(p.lon-minLon)/(maxLon-minLon||1)*560,y=280-(p.lat-minLat)/(maxLat-minLat||1)*240;
-                        const group=document.createElementNS(ns,'g'),circle=document.createElementNS(ns,'circle'),label=document.createElementNS(ns,'text'),title=document.createElementNS(ns,'title');
-                        circle.setAttribute('cx',x);circle.setAttribute('cy',y);circle.setAttribute('r','13');circle.setAttribute('fill','#166a53');
-                        label.setAttribute('x',x);label.setAttribute('y',y+5);label.setAttribute('text-anchor','middle');label.setAttribute('fill','white');label.textContent=String(i+1);
-                        title.textContent=p.row.cells[2].textContent+' · '+p.row.cells[4].textContent;group.append(circle,label,title);svg.append(group);});}
-                    const stops=points.map(p=>p.lat+','+p.lon);if(stops.length){const u=new URL(stops.length===1?'https://www.google.com/maps/search/':'https://www.google.com/maps/dir/');u.searchParams.set('api','1');
-                      if(stops.length===1)u.searchParams.set('query',stops[0]);else{u.searchParams.set('origin',stops[0]);u.searchParams.set('destination',stops.at(-1));if(stops.length>2)u.searchParams.set('waypoints',stops.slice(1,-1).join('|'));}
-                      route.href=u.href;route.hidden=false;}else route.hidden=true;
-                    document.getElementById('map-note').textContent=points.length?'Vista local esquemática de '+points.length+' punto(s); no sustituye a un mapa cartográfico.':'No quedan puntos pendientes con coordenadas.';
-                  }
-                  rows.forEach(row=>{const button=row.querySelector('[data-toggle]'),state=row.querySelector('[data-local-state]'),hour=row.querySelector('[data-hour]');
-                    button.addEventListener('click',()=>{const attended=row.dataset.attended!=='yes';row.dataset.attended=attended?'yes':'no';button.textContent=attended?'Desmarcar atención local':'Marcar atendida (solo esta guía)';state.textContent=attended?'Atendida en esta guía'+(hour.value?' a las '+hour.value:''):'';render();});
-                    hour.addEventListener('change',()=>{if(row.dataset.attended==='yes')state.textContent='Atendida en esta guía'+(hour.value?' a las '+hour.value:'');});});render();
-                })();
-                </script>
-                """;
+        if(visits.isEmpty())cards.append("<div class=\"empty\">No hay visitas asignadas para esta fecha.</div>");
         String html="""
                 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-                <title>Mis visitas pendientes</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#17211d}table{border-collapse:collapse;width:100%%}th,td{border:1px solid #bbb;padding:8px;text-align:left;vertical-align:top}th{background:#eee}small{color:#555}svg{border:1px solid #bbb;max-width:100%%;height:auto}button,input{font:inherit}small{display:block}[data-attended=yes]{opacity:.6}@media print{a{color:#000}}</style></head>
-                <body><h1>Mis visitas pendientes</h1><p><strong>Fiscalizador:</strong> %s</p><p><strong>Fecha:</strong> %s</p>
-                <p>Guía de consulta generada el %s (America/Lima). Marcar una visita aquí no registra diligencias, actas ni cambios en el sistema. Las marcas y horas son solo locales durante esta sesión; un archivo file:// no garantiza conservarlas.</p>
-                <p>Pendientes en esta guía: <strong id="pending-count">%s</strong> · <a id="route-link" href="https://www.google.com/maps" target="_blank" rel="noopener" hidden>Abrir recorrido pendiente en Google Maps</a></p>
-                <svg id="local-map" viewBox="0 0 640 320" role="img" aria-label="Representación esquemática local de puntos pendientes"></svg><p id="map-note">Vista local sin mapas externos.</p>
-                <table><thead><tr><th>Fecha</th><th>Hora programada</th><th>Expediente</th><th>Objeto</th><th>Dirección</th><th>Referencia</th><th>Ubicación</th><th>Estado</th><th>Control local</th></tr></thead><tbody>%s</tbody></table>%s</body></html>
-                """.formatted(escape(user.getDisplayName()),date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
-                        nowLima().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")),visits.size(),rows,guideScript);
+                <title>Guía de jornada · __FECHA__</title><style>
+                :root{color-scheme:light;--green:#155c49;--green2:#19745c;--gold:#caa75e;--ink:#1b352a;--muted:#62756a;--line:#d9e8dd;--paper:#f3f7f3}
+                *{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#eaf3ec 0,#f5f8f5 330px,#f7f9f7 100%);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+                button,input{font:inherit}button:focus-visible,input:focus-visible{outline:3px solid #91c9a5;outline-offset:2px}
+                .hero{position:relative;overflow:hidden;background:linear-gradient(110deg,#103c32,#16674e 70%,#277653);color:white;padding:35px max(20px,calc((100vw - 1080px)/2)) 39px;border-bottom:4px solid var(--gold)}
+                .hero:after{content:"";position:absolute;right:4%;top:-95px;width:275px;height:275px;border:1px solid #ffffff26;border-radius:50%;box-shadow:0 0 0 55px #ffffff09;pointer-events:none}
+                .eyebrow{text-transform:uppercase;letter-spacing:.13em;font-size:.72rem;font-weight:800;color:#d8e6db;margin:0 0 8px}.hero h1{position:relative;margin:0;font-size:clamp(1.9rem,4vw,2.75rem);letter-spacing:-.035em;line-height:1.12}.hero-meta{position:relative;display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;color:#ecf5ed;font-size:.86rem}.hero-meta span{padding:7px 11px;border:1px solid #ffffff50;border-radius:8px;background:#ffffff14}
+                main{max-width:1112px;margin:25px auto;padding:0 16px}.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.metric,.visit-card,.route-panel{background:#fff;border:1px solid var(--line);border-radius:15px;box-shadow:0 6px 20px #164d3b10}.metric{position:relative;min-height:101px;display:flex;flex-direction:column;justify-content:center;padding:17px 20px;border-top:3px solid #62a87b}.metric:nth-child(2){border-top-color:#caa75e}.metric:nth-child(3){border-top-color:#8cb99c}.metric span{display:block;color:var(--muted);font-size:.82rem;font-weight:650}.metric strong{display:block;color:var(--green);font-size:1.9rem;line-height:1.1;letter-spacing:-.035em}
+                .route-panel{display:flex;align-items:center;gap:12px 18px;flex-wrap:wrap;padding:18px 20px;margin:18px 0 29px;border-color:#b9d8c3;background:linear-gradient(110deg,#f2faf4,#fff 72%)}.route-button,.visit-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 16px;border:1px solid var(--green);border-radius:9px;background:var(--green);color:white;font-size:.88rem;font-weight:750;line-height:1.25;cursor:pointer;box-shadow:0 3px 8px #155c4925}.route-button:hover:not(:disabled){background:#0f4e3c}.route-button:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}.route-note{flex:1;min-width:210px;color:#4d6656;font-size:.83rem;line-height:1.45}
+                .visits-heading{margin:0 0 13px;padding-left:12px;border-left:4px solid #2b8658;color:#194c35;font-size:1.23rem;letter-spacing:-.02em}.visits{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.visit-card{min-width:0;display:flex;flex-direction:column;padding:19px 20px;border-color:#dbe8de;transition:opacity .2s,border-color .2s}.visit-card[data-attended=yes]{opacity:.72;border-color:#8db7a7}.visit-top{display:flex;justify-content:space-between;align-items:center;gap:10px}.visit-number{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:50%;background:var(--green);color:white;font-size:.9rem;font-weight:800}.status{border:1px solid #f0ddab;border-radius:999px;padding:5px 10px;background:#fff6df;color:#76540b;font-size:.74rem;font-weight:800}.status-en_curso{border-color:#bae1c9;background:#e2f3e9;color:#155c49}.status-vencida{border-color:#f1c9c4;background:#fff0ed;color:#9b2c20}.time{align-self:start;margin:14px 0 7px;padding:5px 9px;border-radius:7px;background:#e9f5ec;color:#1b6d4b;font-size:.86rem;font-weight:800}.visit-card h2{margin:0 0 4px;color:#123f2e;font-size:1.2rem;letter-spacing:-.025em}.administrado{margin:0 0 5px;color:#263f30;font-weight:750;font-size:.95rem}.object{margin:0 0 13px;color:#617369;font-size:.87rem;line-height:1.45}.visit-card dl{display:grid;grid-template-columns:86px minmax(0,1fr);gap:8px 10px;margin:0;padding:12px;border:1px solid #e6eee8;border-radius:9px;background:#f8fbf8;font-size:.84rem}.visit-card dt{color:#60796a;font-size:.77rem;font-weight:750}.visit-card dd{margin:0;overflow-wrap:anywhere}.visit-actions{margin-top:auto;padding-top:15px}.visit-actions button{min-height:38px;background:#f2f9f3;border-color:#b8d6c1;color:var(--green);box-shadow:none}.visit-actions button:hover{background:#e3f1e6}.hour-label{display:flex;gap:8px;align-items:center;margin-top:12px;color:var(--muted);font-size:.8rem;flex-wrap:wrap}.hour-label input{min-height:37px;border:1px solid #b7cfc0;border-radius:7px;padding:6px 9px;background:#fff;color:var(--ink)}.local-state{min-height:1.2em;margin:8px 0 0;color:var(--green);font-weight:700;font-size:.83rem}.empty{grid-column:1/-1;padding:30px;border:1px dashed #bcd4c3;border-radius:13px;background:white;text-align:center;color:var(--muted)}footer{max-width:1080px;margin:22px auto 30px;padding:0 16px;color:var(--muted);font-size:.78rem;line-height:1.5}
+                @media(max-width:680px){.metrics{grid-template-columns:1fr 1fr;gap:9px}.metric{min-height:84px;padding:13px}.metric strong{font-size:1.5rem}.metrics .metric:first-child{grid-column:1/-1}.visits{grid-template-columns:1fr}.hero{padding:26px 16px 29px}main{margin-top:17px;padding:0 12px}.route-panel{padding:15px}.route-button{width:100%}.route-note{min-width:0}.visit-card{padding:16px}}
+                @media print{body{background:#fff}.hero{print-color-adjust:exact}.visit-card,.metric,.route-panel{box-shadow:none;break-inside:avoid}.visit-actions button,.route-button{display:none}}
+                </style></head><body><header class="hero"><p class="eyebrow">Municipalidad Distrital de San Miguel · Fiscalización</p><h1>Guía de jornada</h1><div class="hero-meta"><span><strong>Fiscalizador:</strong> __NOMBRE__</span><span><strong>Fecha:</strong> __FECHA__</span></div></header>
+                <main><section class="metrics" aria-label="Resumen local"><article class="metric"><strong>__TOTAL__</strong><span>Visitas asignadas</span></article><article class="metric"><strong id="pending-count">__TOTAL__</strong><span>Pendientes en esta guía</span></article><article class="metric"><strong id="attended-count">0</strong><span>Atendidas localmente</span></article></section>
+                <section class="route-panel"><button id="route-button" class="route-button" type="button">Consultar recorrido pendiente</button><span id="route-note" class="route-note" role="status"></span></section>
+                <h2 class="visits-heading">Visitas asignadas</h2><section class="visits">__CARDS__</section></main>
+                <footer>Guía generada el __GENERADO__ (America/Lima). Las marcas de atención solo cambian este archivo durante la sesión y nunca actualizan el sistema.</footer>
+                <script>
+                (()=>{
+                  const cards=[...document.querySelectorAll('.visit-card')],route=document.getElementById('route-button'),note=document.getElementById('route-note'),pending=document.getElementById('pending-count'),attended=document.getElementById('attended-count');
+                  function destinations(){return cards.filter(c=>c.dataset.attended!=='yes').map(c=>c.dataset.destination.trim()).filter(Boolean);}
+                  function googleUrl(stops){const url=new URL(stops.length===1?'https://www.google.com/maps/search/':'https://www.google.com/maps/dir/');url.searchParams.set('api','1');if(stops.length===1)url.searchParams.set('query',stops[0]);else{url.searchParams.set('origin',stops[0]);url.searchParams.set('destination',stops[stops.length-1]);if(stops.length>2)url.searchParams.set('waypoints',stops.slice(1,-1).join('|'));}return url.href;}
+                  function render(){const active=cards.filter(c=>c.dataset.attended!=='yes'),stops=destinations();pending.textContent=String(active.length);attended.textContent=String(cards.length-active.length);route.disabled=!stops.length;note.textContent=!active.length?'No quedan visitas pendientes.':!stops.length?'Las visitas pendientes no tienen dirección ni coordenadas para construir el recorrido.':stops.length<active.length?'Algunas visitas no tienen ubicación suficiente y se omiten del recorrido.':'Se abrirá Google Maps con las visitas pendientes.';}
+                  route.addEventListener('click',()=>{const stops=destinations();if(stops.length)window.open(googleUrl(stops),'_blank','noopener,noreferrer');});
+                  cards.forEach(card=>{const button=card.querySelector('[data-toggle]'),hour=card.querySelector('[data-hour]'),state=card.querySelector('[data-local-state]');button.addEventListener('click',()=>{const done=card.dataset.attended!=='yes';card.dataset.attended=done?'yes':'no';button.textContent=done?'Desmarcar atención local':'Marcar atendida (solo esta guía)';state.textContent=done?'Atendida en esta guía'+(hour.value?' a las '+hour.value:''):'Marca local retirada.';render();});hour.addEventListener('change',()=>{if(card.dataset.attended==='yes')state.textContent='Atendida en esta guía'+(hour.value?' a las '+hour.value:'');});});render();
+                })();
+                </script></body></html>
+                """.replace("__NOMBRE__",escape(user.getDisplayName())).replace("__FECHA__",date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+                .replace("__TOTAL__",Integer.toString(visits.size())).replace("__CARDS__",cards.toString())
+                .replace("__GENERADO__",nowLima().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
         return new HtmlJornadaDownload(html.getBytes(StandardCharsets.UTF_8),"visitas-pendientes-"+date+".html");
     }
 

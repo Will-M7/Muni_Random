@@ -9,10 +9,27 @@ import java.nio.file.Path;
 import java.io.ByteArrayOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import java.util.List;
+import org.springframework.web.multipart.MultipartFile;
+import static org.mockito.Mockito.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class FiscalizacionFileStorageServiceTest {
+    @Test void validaLotesDeHastaDiezDocumentosEnFormatosPermitidos(){
+        var storage=new FiscalizacionFileStorageService("unused");
+        storage.validateDocumentBatch(java.util.stream.IntStream.range(0,10).mapToObj(i->file("doc"+i+".pdf",10)).toList());
+        assertThrows(ConflictException.class,()->storage.validateDocumentBatch(java.util.stream.IntStream.range(0,11).mapToObj(i->file("doc"+i+".pdf",10)).toList()));
+        assertThrows(ConflictException.class,()->storage.validateDocumentBatch(List.of(file("script.exe",10))));
+    }
+
+    @Test void rechazaDocumentoQueSuperaDiezMegabytes(){
+        var storage=new FiscalizacionFileStorageService("unused");
+        assertThrows(ConflictException.class,()->storage.validateDocumentBatch(List.of(file("pesado.pdf",10L*1024*1024+1))));
+    }
+
+    private MultipartFile file(String name,long size){var file=mock(MultipartFile.class);when(file.isEmpty()).thenReturn(false);when(file.getOriginalFilename()).thenReturn(name);when(file.getSize()).thenReturn(size);return file;}
+
     @Test void almacenaUnaFotoConFirmaPngYPermiteRecuperarla(@TempDir Path temp){
         var storage=new FiscalizacionFileStorageService(temp.toString());
         byte[] png={(byte)0x89,'P','N','G',13,10,26,10,0,0,0,0};

@@ -25,6 +25,10 @@ public class DiligenciaFiscalizacionController {
     @PreAuthorize("hasAuthority('DILIGENCIA_INICIAR')")
     public DiligenciaWorkspaceResponse iniciar(@PathVariable Long programacionId,@RequestBody(required=false) InicioDiligenciaRequest request,Authentication auth){return service.iniciar(programacionId,request,auth.getName());}
 
+    @PatchMapping("/diligencias/{id}/gps-inicio")
+    @PreAuthorize("hasAuthority('DILIGENCIA_EDITAR_PROPIA')")
+    public DiligenciaWorkspaceResponse gpsInicio(@PathVariable Long id,@Valid @RequestBody InicioDiligenciaRequest request,Authentication auth){return service.registrarGpsInicio(id,request,auth.getName());}
+
     @PostMapping("/programaciones/{programacionId}/diligencia/registrar-posterior")
     @PreAuthorize("hasAuthority('DILIGENCIA_INICIAR')")
     public DiligenciaWorkspaceResponse registrarPosterior(@PathVariable Long programacionId,
@@ -47,6 +51,13 @@ public class DiligenciaFiscalizacionController {
     @PostMapping(value="/diligencias/{id}/evidencias",consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('EVIDENCIA_AGREGAR')")
     public EvidenciaResponse evidencia(@PathVariable Long id,@RequestParam TipoEvidencia tipo,@RequestParam(required=false) String descripcion,@RequestPart("archivo") MultipartFile archivo,Authentication auth){return service.agregarEvidencia(id,tipo,descripcion,archivo,auth.getName());}
+
+    @PostMapping("/diligencias/{id}/evidencias/{evidenciaId}/retirar")
+    @PreAuthorize("hasAuthority('DILIGENCIA_EDITAR_PROPIA')")
+    public ResponseEntity<Void> retirarEvidencia(@PathVariable Long id,@PathVariable Long evidenciaId,@Valid @RequestBody RetirarEvidenciaRequest request,Authentication auth){
+        service.retirarEvidencia(id,evidenciaId,request.motivo(),auth.getName());
+        return ResponseEntity.noContent().build();
+    }
 
     @GetMapping("/diligencias/{id}/evidencias/{evidenciaId}/archivo")
     @PreAuthorize("hasAuthority('EVIDENCIA_AGREGAR')")

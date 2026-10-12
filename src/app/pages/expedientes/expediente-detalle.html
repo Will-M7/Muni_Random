@@ -27,27 +27,183 @@
     </section>
     <section class="panel section-panel content-panel">
       <div class="section-heading"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v18h16V8Z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg></span><div><h2>Documentos</h2><p>Documentos asociados al expediente.</p></div></div>
-      <div class="doc-list"><div *ngIf="e.documentoSustentoNombre"><span><b>{{e.documentoSustentoNombre}}</b><small>PDF · Expediente {{e.codigo}} · {{e.documentoSustentoFecha||'Fecha histórica no disponible'}} · Responsable histórico no registrado</small></span><button class="btn-light" type="button" (click)="documento()">Abrir documento</button></div><div *ngIf="e.reporteFiscalizadorNombre"><span><b>{{e.reporteFiscalizadorNombre}}</b><small>Reporte histórico · Expediente {{e.codigo}} · Fecha y responsable no disponibles en este registro</small></span><button class="btn-light" type="button" (click)="reporte()">Abrir reporte</button></div><div *ngFor="let d of documentos"><span><b>{{d.nombre}}</b><small>{{tipoArchivo(d.nombre,d.tipoMime)}} · Expediente {{e.codigo}} · Subido {{fechaLima(d.adjuntadoEn)}} (America/Lima) · Responsable: {{d.adjuntadoPor}}</small></span><button class="btn-light" type="button" (click)="descargarDocumento(d)">{{d.tipoMime==='application/pdf'?'Abrir documento':'Descargar'}}</button></div><p class="empty-notice" *ngIf="!e.documentoSustentoNombre&&!e.reporteFiscalizadorNombre&&!documentos.length">No hay documentos asociados.</p></div>
-      <div *ngIf="e.estado!=='CERRADO'&&e.estado!=='CANCELADO'"><label>Adjuntar documentos<input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" (change)="seleccionarDocumentos($event)"></label><button type="button" class="btn-light" (click)="adjuntarDocumentos()" [disabled]="!archivos.length||adjuntando">{{adjuntando?'Adjuntando…':'Adjuntar documentos'}}</button></div>
+      <div class="doc-list">
+        <div *ngIf="e.documentoSustentoNombre">
+          <span><b>{{e.documentoSustentoNombre}}</b><small>PDF · Expediente {{e.codigo}} · {{e.documentoSustentoFecha||'Fecha histórica no disponible'}} · Responsable histórico no registrado</small></span>
+          <button class="btn-light btn-doc-action" type="button" (click)="documento()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v18h16V8Z"/><path d="M14 2v6h6"/></svg>
+            Abrir documento
+          </button>
+        </div>
+        <div *ngIf="e.reporteFiscalizadorNombre">
+          <span><b>{{e.reporteFiscalizadorNombre}}</b><small>Reporte histórico · Expediente {{e.codigo}} · Fecha y responsable no disponibles en este registro</small></span>
+          <button class="btn-light btn-doc-action" type="button" (click)="reporte()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v18h16V8Z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg>
+            Abrir reporte
+          </button>
+        </div>
+        <div *ngFor="let d of documentosGenerales">
+          <span><b>{{d.nombre}}</b><small>{{tipoArchivo(d.nombre,d.tipoMime)}} · {{(d.tamanoBytes/1024/1024).toFixed(2)}} MB · Subido {{fechaLima(d.adjuntadoEn)}} (America/Lima) · Responsable: {{d.adjuntadoPor}}</small></span>
+          <button class="btn-light btn-doc-action" type="button" (click)="descargarDocumento(d)">
+            <svg *ngIf="d.tipoMime==='application/pdf'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v18h16V8Z"/><path d="M14 2v6h6"/></svg>
+            <svg *ngIf="d.tipoMime!=='application/pdf'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            {{d.tipoMime==='application/pdf'?'Abrir documento':'Descargar'}}
+          </button>
+        </div>
+        <p class="empty-notice" *ngIf="!e.documentoSustentoNombre&&!e.reporteFiscalizadorNombre&&!documentosGenerales.length">No hay documentos asociados.</p>
+      </div>
+      <div class="document-upload" *ngIf="puedeAdjuntar">
+        <input #documentoSelector class="file-input" type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" (change)="seleccionarDocumentos($event)">
+        <button type="button" class="btn-choose-file" (click)="documentoSelector.click()" [disabled]="adjuntando">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Seleccionar archivos
+        </button>
+        <small class="upload-hint">{{archivos.length}} de 10 archivos en este envío · Puedes realizar más envíos después.</small>
+        <ul class="selected-files" *ngIf="archivos.length">
+          <li *ngFor="let file of archivos;let i=index">
+            <span>{{file.name}} <small>({{(file.size/1024/1024).toFixed(2)}} MB)</small></span>
+            <button type="button" class="btn-remove-file" (click)="quitarDocumento(i)" [disabled]="adjuntando" title="Quitar archivo">Quitar</button>
+          </li>
+        </ul>
+        <button type="button" class="btn-primary-action" (click)="adjuntarDocumentos()" [disabled]="!archivos.length||adjuntando">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          {{adjuntando?'Adjuntando…':'Adjuntar documentos'}}
+        </button>
+      </div>
+      <p class="document-notice" *ngIf="avisoDocumentos" role="status">{{avisoDocumentos}}</p>
     </section>
     <section class="panel section-panel content-panel">
-      <div class="section-heading"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span><div><h2>Visitas programadas</h2><p>El estado del expediente se mantiene separado del estado de cada visita.</p></div></div>
+      <div class="section-heading">
+        <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
+        <div><h2>Visitas programadas</h2><p>El estado del expediente se mantiene separado del estado de cada visita.</p></div>
+        <div class="heading-action" *ngIf="e.estado!=='CERRADO' && e.estado!=='CANCELADO'">
+          <button type="button" class="btn-schedule-visit" (click)="abrirProgramacion()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13v6M9 16h6"/></svg>
+            {{e.programaciones.length?'Programar nueva visita':'Programar primera visita'}}
+          </button>
+        </div>
+      </div>
       <p class="empty-notice" *ngIf="!e.programaciones.length"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>No hay visitas programadas.</p>
-      <button *ngIf="e.estado!=='CERRADO' && e.estado!=='CANCELADO'" type="button" class="btn-light" (click)="abrirProgramacion()">{{e.programaciones.length?'Programar nueva visita':'Programar primera visita'}}</button>
-      <article class="schedule" *ngFor="let p of e.programaciones"><div class="schedule-date"><strong>{{p.fecha?(p.fecha|date:'dd/MM/yyyy'):'Sin fecha'}}</strong><span>{{horaDual(p.hora)}} · {{p.tipoVisita==='INOPINADA'?'Visita inopinada':'Visita programada'}}</span></div><div class="schedule-state"><span class="pill">{{p.estado}}</span><small>{{p.fiscalizadorNombre||'Sin fiscalizador'}}</small></div><div class="schedule-reason"><small *ngIf="p.motivoReprogramacion">Motivo de reprogramación: {{p.motivoReprogramacion}}</small><small *ngIf="p.motivoCancelacion">Motivo de cancelación: {{p.motivoCancelacion}}</small><small *ngIf="p.motivoSeguimiento">Motivo de seguimiento: {{p.motivoSeguimiento}} · revisión #{{p.revisionOrigenId}}</small><small *ngIf="p.programacionAnteriorId">Sustituye visita anterior #{{p.programacionAnteriorId}}</small></div><div class="schedule-actions" *ngIf="puedeModificar(p)"><button type="button" class="btn-light" (click)="abrir('reprogramar',p)">Reprogramar</button><button type="button" class="btn-danger" (click)="abrir('cancelar',p)">Cancelar visita</button></div></article>
+      <article class="schedule" *ngFor="let p of e.programaciones">
+        <div class="schedule-date"><strong>{{p.fecha?(p.fecha|date:'dd/MM/yyyy'):'Sin fecha'}}</strong><span>{{horaDual(p.hora)}} · {{p.tipoVisita==='INOPINADA'?'Visita inopinada':'Visita programada'}}</span></div>
+        <div class="schedule-state"><span class="pill">{{p.estado}}</span><small>{{p.fiscalizadorNombre||'Sin fiscalizador'}}</small></div>
+        <div class="schedule-reason"><small *ngIf="p.motivoReprogramacion">Motivo de reprogramación: {{p.motivoReprogramacion}}</small><small *ngIf="p.motivoCancelacion">Motivo de cancelación: {{p.motivoCancelacion}}</small><small *ngIf="p.motivoSeguimiento">Motivo de seguimiento: {{p.motivoSeguimiento}} · revisión #{{p.revisionOrigenId}}</small><small *ngIf="p.programacionAnteriorId">Sustituye visita anterior #{{p.programacionAnteriorId}}</small></div>
+        <div class="schedule-actions" *ngIf="puedeModificar(p)">
+          <button type="button" class="btn-light" (click)="abrir('reprogramar',p)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+            Reprogramar
+          </button>
+          <button type="button" class="btn-danger" (click)="abrir('cancelar',p)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            Cancelar visita
+          </button>
+        </div>
+      </article>
     </section>
-    <section class="panel section-panel content-panel">
+    <section class="panel section-panel content-panel cycle-panel">
       <div class="section-heading"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5m4-2v5l4 2"/></svg></span><div><h2>Ciclos de fiscalización</h2><p>Cronología de diligencias, actas, aclaraciones y conclusiones registradas.</p></div></div>
-      <ol class="timeline cycles"><li *ngFor="let c of ciclos"><time>{{c.fechaInicio|date:'dd/MM/yyyy HH:mm'}} · {{c.fechaCierre|date:'HH:mm'}}</time><div><b>Visita · {{c.tipoVisita}} · {{c.lugar}}</b><p>Fiscalizador: {{c.fiscalizador}} · {{c.actaCodigo||'Sin acta'}}</p><div *ngIf="c.revision as r"><p>Revisión {{r.estado}} <span *ngIf="r.conclusion">· Conclusión: {{r.conclusion}}</span></p><p *ngIf="r.fundamento">Fundamento: {{r.fundamento}}</p></div><div *ngFor="let a of c.aclaraciones"><small>Aclaración {{a.estado}} · {{a.fechaSolicitud|date:'dd/MM/yyyy HH:mm'}}</small><p>{{a.mensaje}}</p><p *ngIf="a.respuesta">Respuesta: {{a.respuesta}}</p></div><button *ngIf="c.revision?.estado!=='FINALIZADA'" type="button" class="btn-light" (click)="revisar(c)">{{c.revision?'Abrir revisión':'Iniciar revisión'}}</button></div></li></ol><p class="empty-notice" *ngIf="!ciclos.length"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v18h16V8Z"/><path d="M14 2v6h6"/></svg>No hay diligencias estructuradas. Los casos legacy conservan sus registros sin revisiones inventadas.</p>
+      <ol class="timeline cycles">
+        <li *ngFor="let c of ciclos">
+          <time>{{c.fechaInicio|date:'dd/MM/yyyy HH:mm'}} · {{c.fechaCierre|date:'HH:mm'}}</time>
+          <div>
+            <b>Visita · {{c.tipoVisita}} · {{c.lugar}}</b>
+            <p>Fiscalizador: {{c.fiscalizador}} · {{c.actaCodigo||'Sin acta'}}</p>
+            <div *ngIf="c.revision as r"><p>Revisión {{r.estado}} <span *ngIf="r.conclusion">· Conclusión: {{r.conclusion}}</span></p><p *ngIf="r.fundamento">Fundamento: {{r.fundamento}}</p></div>
+            <div *ngFor="let a of c.aclaraciones"><small>Aclaración {{a.estado}} · {{a.fechaSolicitud|date:'dd/MM/yyyy HH:mm'}}</small><p>{{a.mensaje}}</p><p *ngIf="a.respuesta">Respuesta: {{a.respuesta}}</p></div>
+            <button *ngIf="c.revision?.estado!=='FINALIZADA'" type="button" class="btn-open-review" (click)="revisar(c)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              {{c.revision?'Abrir revisión':'Iniciar revisión'}}
+            </button>
+          </div>
+        </li>
+      </ol>
+      <p class="empty-notice" *ngIf="!ciclos.length"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v18h16V8Z"/><path d="M14 2v6h6"/></svg>No hay diligencias estructuradas. Los casos legacy conservan sus registros sin revisiones inventadas.</p>
     </section>
-    <section class="panel section-panel content-panel">
+    <section id="actas" class="panel section-panel content-panel">
       <div class="section-heading"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3h8M9 3v3h6V3M6 6h12v15H6z"/><path d="M9 12h6m-6 4h6"/></svg></span><div><h2>Actas de fiscalización</h2><p>Las actas registran hechos y observaciones de la diligencia. No determinan infracciones ni sanciones.</p></div></div>
-      <div class="acta-card" *ngFor="let acta of actas"><div><b>{{acta.codigo}}</b><small>Generada {{acta.generadoEn|date:'dd/MM/yyyy HH:mm'}} · {{acta.firmaFiscalizadoEstado}}</small></div><div class="schedule-actions"><button type="button" class="btn-light" (click)="descargarActa(acta)">Descargar acta PDF</button><button *ngIf="acta.pdfFirmadoNombre" type="button" class="btn-light" (click)="descargarCopiaFirmada(acta)">Copia firmada: {{acta.pdfFirmadoNombre}}</button></div></div><p class="empty-notice" *ngIf="!actas.length"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v18h16V8Z"/><path d="M14 2v6h6"/></svg>Todavía no hay actas estructuradas para este expediente. Los resultados legacy conservan su reporte anterior.</p>
+      <div class="acta-card" *ngFor="let acta of actas">
+        <div><b>{{acta.codigo}}</b><small>Generada {{acta.generadoEn|date:'dd/MM/yyyy HH:mm'}} · {{acta.firmaFiscalizadoEstado}}</small></div>
+        <div class="schedule-actions">
+          <button type="button" class="btn-light btn-doc-action" (click)="descargarActa(acta)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Descargar acta PDF
+          </button>
+          <button *ngIf="acta.pdfFirmadoNombre" type="button" class="btn-light btn-doc-action" (click)="descargarCopiaFirmada(acta)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v18h16V8Z"/><path d="M14 2v6h6"/></svg>
+            Copia firmada: {{acta.pdfFirmadoNombre}}
+          </button>
+        </div>
+      </div>
+      <p class="empty-notice" *ngIf="!actas.length"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v18h16V8Z"/><path d="M14 2v6h6"/></svg>Todavía no hay actas estructuradas para este expediente. Los resultados legacy conservan su reporte anterior.</p>
+
+      <div class="acta-attachments">
+        <h3>Actas adjuntas por MUNICIPIO</h3>
+        <p>Estos PDF se conservan como documentos del expediente; no sustituyen el acta emitida por el fiscalizador.</p>
+        <div class="doc-list">
+          <div *ngFor="let d of actasAdjuntas">
+            <span><b>{{d.nombre}}</b><small>PDF · {{(d.tamanoBytes/1024/1024).toFixed(2)}} MB · Subida {{fechaLima(d.adjuntadoEn)}} (America/Lima) · Responsable: {{d.adjuntadoPor}}</small></span>
+            <button class="btn-light btn-doc-action" type="button" (click)="descargarDocumento(d)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v18h16V8Z"/><path d="M14 2v6h6"/></svg>
+              Abrir PDF
+            </button>
+          </div>
+          <p class="empty-notice" *ngIf="!actasAdjuntas.length">No hay actas municipales adjuntas.</p>
+        </div>
+        <div class="document-upload" *ngIf="puedeAdjuntar">
+          <input #actaSelector class="file-input" type="file" multiple accept=".pdf,application/pdf" (change)="seleccionarActas($event)">
+          <button class="btn-choose-file" type="button" (click)="actaSelector.click()" [disabled]="adjuntandoActas">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Seleccionar actas PDF
+          </button>
+          <small class="upload-hint">{{actaArchivos.length}} de 10 archivos en este envío</small>
+          <ul class="selected-files" *ngIf="actaArchivos.length">
+            <li *ngFor="let file of actaArchivos;let i=index">
+              <span>{{file.name}} <small>({{(file.size/1024/1024).toFixed(2)}} MB)</small></span>
+              <button class="btn-remove-file" type="button" (click)="quitarActa(i)" [disabled]="adjuntandoActas" title="Quitar archivo">Quitar</button>
+            </li>
+          </ul>
+          <button class="btn-primary-action" type="button" (click)="adjuntarActas()" [disabled]="!actaArchivos.length||adjuntandoActas">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            {{adjuntandoActas?'Adjuntando…':'Adjuntar actas'}}
+          </button>
+        </div>
+      </div>
     </section>
     <section class="panel section-panel content-panel history-panel">
       <div class="section-heading"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div><h2>Historial del expediente</h2><p>Actividad registrada en el expediente.</p></div></div>
-      <ol class="timeline"><li *ngFor="let h of e.historial"><time>{{h.fechaHora|date:'dd/MM/yyyy HH:mm'}}</time><div><b>{{nombreEvento(h.tipoEvento)}}</b><p>{{h.descripcion}}</p><small>Responsable: {{h.actor||'Sistema / migración'}}</small><details *ngIf="h.valoresAnteriores||h.valoresNuevos"><summary>Ver detalles</summary><p *ngIf="h.valoresAnteriores">Antes:</p><ul><li *ngFor="let detalle of detalles(h.valoresAnteriores)">{{detalle}}</li></ul><p *ngIf="h.valoresNuevos">Después:</p><ul><li *ngFor="let detalle of detalles(h.valoresNuevos)">{{detalle}}</li></ul></details></div></li></ol>
+      <ol class="timeline history-list"><li *ngFor="let h of historialVisible"><div><b>{{nombreEvento(h.tipoEvento)}}</b><time>{{fechaHistorial(h.fechaHora)}}</time><small>Responsable: {{h.actor||'Sistema / migración'}}</small></div></li></ol>
+      <button *ngIf="historialOrdenado.length>5" class="btn-light history-toggle" type="button" (click)="historialCompleto=!historialCompleto">{{historialCompleto?'Mostrar menos':'Ver historial completo'}}</button>
     </section>
   </ng-container>
-  <div class="modal-backdrop" *ngIf="accion" (click)="cerrar()"><section class="modal" (click)="$event.stopPropagation()"><button class="modal-close" type="button" (click)="cerrar()">Cerrar</button><h2>{{accion==='programar'?(expediente?.programaciones?.length?'Programar nueva visita':'Programar primera visita'):accion==='reprogramar'?'Reprogramar visita':'Cancelar visita'}}</h2><p *ngIf="accion==='reprogramar'">Se conservará esta programación en el historial y se creará una nueva.</p><ng-container *ngIf="accion==='programar'||accion==='reprogramar'"><label>Fecha nueva<input type="date" [(ngModel)]="fecha" (change)="cargarAgenda()" required></label><label>Hora (24 h)<input type="time" min="00:00" max="23:59" step="60" [(ngModel)]="hora" required><small>{{horaDual(hora)}}</small></label><label>Tipo<select [(ngModel)]="tipoVisita"><option value="PROGRAMADA">Programada</option><option value="INOPINADA">Inopinada</option></select></label><label>Fiscalizador<select [(ngModel)]="fiscalizadorId"><option value="">Seleccione</option><option *ngFor="let f of fiscalizadores" [value]="f.id">{{f.nombre}}</option></select></label><div *ngIf="fecha"><p>Agenda del {{fecha}} · Carga válida: {{cargaValida}} / {{limiteDiario}}</p><p class="error" *ngIf="cargaValida+(accion==='reprogramar'&&programacion?.fecha===fecha?0:1)>limiteDiario">Esta visita superaría el límite orientativo. Podrás confirmar para continuar.</p><p *ngIf="agendaError" role="alert">{{agendaError}}</p><p *ngIf="!agendaError&&!agenda.length">Sin visitas registradas para esta fecha.</p><div *ngFor="let f of fiscalizadores"><small>{{f.nombre}}: {{totalFiscalizador(f.id)}} visita(s)</small></div><table *ngIf="agenda.length"><thead><tr><th>Fiscalizador</th><th>Hora</th><th>Expediente</th><th>Estado</th></tr></thead><tbody><tr *ngFor="let v of agenda"><td>{{v.fiscalizadorNombre}}</td><td>{{horaDual(v.hora)}}</td><td>{{v.expedienteCodigo}}</td><td>{{v.estado}}<span *ngIf="conflicto(v)"> · Conflicto horario</span></td></tr></tbody></table></div></ng-container><label *ngIf="accion!=='programar'">Motivo obligatorio<textarea [(ngModel)]="motivo" rows="3" required></textarea></label><p class="error" *ngIf="error">{{error}}</p><button class="btn-primary" type="button" (click)="guardar()">{{accion==='programar'?'Confirmar programación':accion==='reprogramar'?'Confirmar reprogramación':'Confirmar cancelación'}}</button></section></div>
+  <div class="modal-backdrop" *ngIf="accion" (click)="cerrar()">
+    <section class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{accion==='programar'?(expediente?.programaciones?.length?'Programar nueva visita':'Programar primera visita'):accion==='reprogramar'?'Reprogramar visita':'Cancelar visita'}}</h2>
+        <button class="modal-close" type="button" (click)="cerrar()" aria-label="Cerrar modal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <p *ngIf="accion==='reprogramar'" class="modal-notice">Se conservará esta programación en el historial y se creará una nueva.</p>
+      <ng-container *ngIf="accion==='programar'||accion==='reprogramar'">
+        <label>Fecha nueva<input type="date" [(ngModel)]="fecha" (change)="cargarAgenda()" required></label>
+        <label>Hora (24 h)<input type="time" min="00:00" max="23:59" step="60" [(ngModel)]="hora" required><small>{{horaDual(hora)}}</small></label>
+        <label>Tipo<select [(ngModel)]="tipoVisita"><option value="PROGRAMADA">Programada</option><option value="INOPINADA">Inopinada</option></select></label>
+        <label>Fiscalizador<select [(ngModel)]="fiscalizadorId"><option value="">Seleccione</option><option *ngFor="let f of fiscalizadores" [value]="f.id">{{f.nombre}}</option></select></label>
+        <div *ngIf="fecha" class="modal-agenda">
+          <p class="agenda-summary">Agenda del {{fecha}} · Carga válida: <strong>{{cargaValida}} / {{limiteDiario}}</strong></p>
+          <p class="error" *ngIf="cargaValida+(accion==='reprogramar'&&programacion?.fecha===fecha?0:1)>limiteDiario">Esta visita superaría el límite orientativo. Podrás confirmar para continuar.</p>
+          <p *ngIf="agendaError" role="alert">{{agendaError}}</p>
+          <p *ngIf="!agendaError&&!agenda.length" class="empty-agenda">Sin visitas registradas para esta fecha.</p>
+          <div *ngFor="let f of fiscalizadores" class="fisc-load"><small>{{f.nombre}}: {{totalFiscalizador(f.id)}} visita(s)</small></div>
+          <table *ngIf="agenda.length" class="agenda-table"><thead><tr><th>Fiscalizador</th><th>Hora</th><th>Expediente</th><th>Estado</th></tr></thead><tbody><tr *ngFor="let v of agenda"><td>{{v.fiscalizadorNombre}}</td><td>{{horaDual(v.hora)}}</td><td>{{v.expedienteCodigo}}</td><td>{{v.estado}}<span *ngIf="conflicto(v)" class="conflict-badge"> · Conflicto</span></td></tr></tbody></table>
+        </div>
+      </ng-container>
+      <label *ngIf="accion!=='programar'">Motivo obligatorio<textarea [(ngModel)]="motivo" rows="3" required></textarea></label>
+      <p class="error" *ngIf="error">{{error}}</p>
+      <div class="modal-actions">
+        <button class="btn-light modal-cancel" type="button" (click)="cerrar()">Cancelar</button>
+        <button class="btn-primary" type="button" (click)="guardar()">{{accion==='programar'?'Confirmar programación':accion==='reprogramar'?'Confirmar reprogramación':'Confirmar cancelación'}}</button>
+      </div>
+    </section>
+  </div>
 </main>

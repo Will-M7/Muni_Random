@@ -13,16 +13,32 @@ import java.nio.file.Paths;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.Set;
+import java.util.List;
 import java.util.zip.ZipInputStream;
 
 @Service
 public class FiscalizacionFileStorageService {
     public static final long DEFAULT_MAX_FILE_BYTES=10L*1024*1024;
     @Value("${app.storage.max-size-bytes:10485760}") private long maxFileBytes=DEFAULT_MAX_FILE_BYTES;
+    @Value("${app.storage.max-batch-size-bytes:104857600}") private long maxBatchBytes=100L*1024*1024;
     private final Path root;
 
     public FiscalizacionFileStorageService(@Value("${app.storage.diligencias-path:uploads/diligencias}") String path) {
         root=Paths.get(path).toAbsolutePath().normalize();
+    }
+
+    public void validateDocumentBatch(List<MultipartFile> files){
+        if(files==null||files.isEmpty())return;
+        if(files.size()>10)throw new ConflictException("Puedes adjuntar como máximo 10 documentos por envío.");
+        long total=0;
+        for(var file:files){
+            if(file==null||file.isEmpty())throw new ConflictException("Uno de los documentos está vacío.");
+            if(file.getSize()>Math.min(maxFileBytes,DEFAULT_MAX_FILE_BYTES))throw new ConflictException("Cada documento debe tener como máximo 10 MB.");
+            String ext=extension(file.getOriginalFilename()==null?"":file.getOriginalFilename());
+            if(!Set.of("pdf","jpg","jpeg","png","doc","docx").contains(ext))throw new ConflictException("Solo se admiten PDF, JPG, JPEG, PNG, DOC y DOCX.");
+            try{total=Math.addExact(total,file.getSize());}catch(ArithmeticException ex){throw new ConflictException("El tamaño total de documentos supera el máximo permitido.");}
+            if(total>Math.min(maxBatchBytes,100L*1024*1024))throw new ConflictException("El tamaño total de documentos supera el máximo permitido de 100 MB.");
+        }
     }
 
     public StoredFile storeEvidence(MultipartFile file, boolean photoOnly) {

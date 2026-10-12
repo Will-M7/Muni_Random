@@ -23,24 +23,23 @@ public class FiscalizacionAltaController {
     @PreAuthorize("hasAuthority('EXPEDIENTE_CREAR')")
     public ResponseEntity<ExpedienteResponse> crear(@Valid @RequestPart("fiscalizacion") CrearFiscalizacionRequest request,
             @RequestPart(value="documentos",required=false) List<MultipartFile> documentos,Authentication auth){
-        if(request.metodoUbicacion()!=null){
-            if(request.expediente().latitud()==null||request.expediente().longitud()==null)
-                throw new IllegalArgumentException("Indica coordenadas válidas para el predio.");
-            var preferences=settings.forUser(auth.getName());
-            boolean enabled=switch(request.metodoUbicacion()){
-                case "MAPA_INTERNO" -> preferences.mapaInterno();
-                case "GOOGLE_EXTERNO" -> preferences.googleExterno();
-                case "GOOGLE_URL" -> preferences.googleUrl();
-                case "SOLICITUD_EXISTENTE" -> request.expediente().solicitudCodigo()!=null;
-                default -> false;
-            };
-            if(!enabled)throw new AccessDeniedException("El método de ubicación está desactivado para tu cuenta.");
-            if(request.metodoUbicacion().startsWith("GOOGLE")){
-                var point=pe.gob.munisanmiguel.service.GoogleMapsCoordinates.extract(request.enlaceGoogle());
-                if(point==null||request.expediente().latitud()==null||request.expediente().longitud()==null||
-                        point[0].compareTo(request.expediente().latitud())!=0||point[1].compareTo(request.expediente().longitud())!=0)
-                    throw new IllegalArgumentException("El enlace de Google Maps no corresponde a las coordenadas confirmadas.");
-            }
+        if(request.metodoUbicacion()==null||request.metodoUbicacion().isBlank())
+            throw new IllegalArgumentException("Selecciona un método de ubicación habilitado para tu cuenta.");
+        var latitude=request.expediente().latitud();var longitude=request.expediente().longitud();
+        if(latitude==null||longitude==null||latitude.abs().compareTo(java.math.BigDecimal.valueOf(90))>0||longitude.abs().compareTo(java.math.BigDecimal.valueOf(180))>0)
+            throw new IllegalArgumentException("Indica coordenadas válidas para el predio.");
+        var preferences=settings.forUser(auth.getName());
+        boolean enabled=switch(request.metodoUbicacion()){
+            case "MAPA_INTERNO" -> preferences.mapaInterno();
+            case "GOOGLE_EXTERNO" -> preferences.googleExterno();
+            case "GOOGLE_URL" -> preferences.googleUrl();
+            default -> false;
+        };
+        if(!enabled)throw new AccessDeniedException("El método de ubicación está desactivado para tu cuenta.");
+        if("GOOGLE_URL".equals(request.metodoUbicacion())){
+            var point=pe.gob.munisanmiguel.service.GoogleMapsCoordinates.extract(request.enlaceGoogle());
+            if(point==null||point[0].compareTo(latitude)!=0||point[1].compareTo(longitude)!=0)
+                throw new IllegalArgumentException("El enlace de Google Maps no corresponde a las coordenadas confirmadas.");
         }
         if(request.primeraProgramacion()!=null&&(!has(auth,"PROGRAMACION_CREAR")||!has(auth,"FISCALIZADOR_ASIGNAR")))
             throw new AccessDeniedException("No tienes permisos para programar y asignar fiscalizadores.");
@@ -57,6 +56,13 @@ public class FiscalizacionAltaController {
     public List<ExpedienteDocumentoResponse> adjuntar(@PathVariable String codigo,
             @RequestPart("documentos") List<MultipartFile> archivos,Authentication auth){
         return service.adjuntar(codigo,archivos,auth.getName());
+    }
+
+    @PostMapping(value="/{codigo}/actas-adjuntas",consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('EXPEDIENTE_EDITAR')")
+    public List<ExpedienteDocumentoResponse> adjuntarActas(@PathVariable String codigo,
+            @RequestPart("actas") List<MultipartFile> archivos,Authentication auth){
+        return service.adjuntarActas(codigo,archivos,auth.getName());
     }
 
     @GetMapping("/{codigo}/documentos/{id}/archivo") @PreAuthorize("hasAuthority('EXPEDIENTE_VER')")

@@ -6,6 +6,8 @@ import org.springframework.core.io.Resource;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import pe.gob.munisanmiguel.dto.ApiDtos.*;
 import pe.gob.munisanmiguel.entity.*;
@@ -57,6 +59,13 @@ public class DiligenciaFiscalizacionService {
     public DiligenciaWorkspaceResponse iniciar(Long programacionId,InicioDiligenciaRequest r,String username){
         var p=programaciones.findByIdForUpdate(programacionId).orElseThrow(()->new NotFoundException("Programación no encontrada."));
         var user=usuario(username);validarPropiedad(p,user);
+        var existente=diligencias.findByProgramacionId(programacionId).orElse(null);
+        if(existente!=null){
+            if(p.getEstadoProgramacion()==EstadoProgramacion.EN_CURSO&&
+                    (existente.getEstado()==EstadoDiligencia.INICIADA||existente.getEstado()==EstadoDiligencia.EN_DESARROLLO))
+                return workspace(p,existente);
+            throw new ConflictException("Esta programación ya tiene una diligencia registrada.");
+        }
         if(p.getEstadoProgramacion()==EstadoProgramacion.PROGRAMADA&&p.getFecha()!=null&&p.getFecha().isBefore(LocalDate.now(LIMA)))
             throw new ConflictException("Terminó el día programado. Registra la visita posteriormente si se realizó.");
         if(p.getFecha()==null||p.getFecha().isAfter(LocalDate.now(LIMA)))
@@ -65,8 +74,6 @@ public class DiligenciaFiscalizacionService {
         if(p.getEstadoProgramacion()!=EstadoProgramacion.PROGRAMADA&&
                 !(p.getEstadoProgramacion()==EstadoProgramacion.VENCIDA&&vigenteHoy))
             throw new ConflictException("Solo se puede iniciar una visita vigente durante su día programado.");
-        if(diligencias.findByProgramacionId(programacionId).isPresent())
-            throw new ConflictException("Esta programación ya tiene una diligencia iniciada.");
         var place=gps(r==null?null:r.estadoGps(),r==null?null:r.latitud(),r==null?null:r.longitud());
         LocalDateTime now=now();var d=new DiligenciaFiscalizacion();d.setExpediente(p.getExpediente());d.setProgramacion(p);
         d.setFiscalizadorResponsable(p.getFiscalizador());d.setFechaInicio(now);d.setLatitudInicio(place.lat);d.setLongitudInicio(place.lon);
@@ -81,6 +88,18 @@ public class DiligenciaFiscalizacionService {
         participantes.save(responsible);
         evento(d,"PARTICIPANTE_AGREGADO","Fiscalizador responsable incorporado automáticamente",null,map("tipo","FISCALIZADOR_RESPONSABLE","nombre",p.getFiscalizador().getNombre()),username);
         return workspace(p,d);
+    }
+
+    @Transactional
+    public DiligenciaWorkspaceResponse registrarGpsInicio(Long diligenciaId,InicioDiligenciaRequest request,String username){
+        var d=diligenciaBloqueada(diligenciaId);var user=usuario(username);validarPropiedad(d.getProgramacion(),user);editable(d);
+        if(request==null||request.estadoGps()!=EstadoGps.DISPONIBLE||request.latitud()==null||request.longitud()==null)
+            throw new ConflictException("Confirma el permiso de ubicación y vuelve a intentarlo.");
+        var point=gps(request.estadoGps(),request.latitud(),request.longitud());
+        d.setLatitudInicio(point.lat);d.setLongitudInicio(point.lon);d.setGpsInicioEstado(point.status);d.setUpdatedAt(now());
+        evento(d,"GPS_INICIO_REGISTRADO","El fiscalizador registró voluntariamente su ubicación de inicio.",null,
+                map("gps","DISPONIBLE"),username);
+        return workspace(d.getProgramacion(),d);
     }
 
     @Transactional
@@ -149,15 +168,48 @@ public class DiligenciaFiscalizacionService {
 
     @Transactional
     public EvidenciaResponse agregarEvidencia(Long id,TipoEvidencia tipo,String descripcion,MultipartFile file,String username){
-        var d=diligenciaBloqueada(id);var user=usuario(username);validarPropiedad(d.getProgramacion(),user);editable(d);
+        var d=diligenciaBloqueada(id);var user=usuario(username);validarPropiedad(d.getProgramacion(),user);
         if(tipo==null)throw new ConflictException("Indica el tipo de evidencia.");
+        if(file==null||file.isEmpty())throw new ConflictException("Selecciona un archivo para adjuntarlo.");
+        if(file.getSize()>FiscalizacionFileStorageService.DEFAULT_MAX_FILE_BYTES)throw new ConflictException("El archivo supera el máximo de 10 MB.");
+        String filename=Objects.toString(file.getOriginalFilename(),"").toLowerCase(Locale.ROOT);
+        String extension=filename.contains(".")?filename.substring(filename.lastIndexOf('.')+1):"";
+        if(!Set.of("pdf","jpg","jpeg","png","doc","docx").contains(extension))
+            throw new ConflictException("Solo se admiten PDF, JPG, JPEG, PNG, DOC y DOCX.");
+        if((tipo==TipoEvidencia.PDF&&!extension.equals("pdf"))||
+                (tipo==TipoEvidencia.FOTO&&!Set.of("jpg","jpeg","png").contains(extension))||
+                (tipo==TipoEvidencia.DOCUMENTO&&!Set.of("doc","docx").contains(extension)))
+            throw new ConflictException("El tipo de evidencia no corresponde al formato del archivo.");
+        boolean anexoActa=d.getEstado()==EstadoDiligencia.FINALIZADA;
+        if(anexoActa){
+            if(tipo!=TipoEvidencia.PDF)throw new ConflictException("Después de finalizar solo se permite un anexo PDF al acta.");
+            long anexos=evidencias.findAllByDiligenciaIdOrderByFechaHoraAscIdAsc(d.getId()).stream()
+                    .filter(e->d.getFechaCierre()!=null&&e.getFechaHora()!=null&&!e.getFechaHora().isBefore(d.getFechaCierre())).count();
+            if(anexos>0)throw new ConflictException("El acta ya tiene su anexo adicional. No se puede modificar el acta emitida.");
+        }else editable(d);
         var stored=storage.storeEvidence(file,tipo==TipoEvidencia.FOTO);
+        if(TransactionSynchronizationManager.isSynchronizationActive())
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){
+                @Override public void afterCompletion(int status){if(status!=STATUS_COMMITTED)storage.delete(stored.internalName());}
+            });
         try{
             var e=new EvidenciaFiscalizacion();e.setDiligencia(d);e.setTipo(tipo);e.setNombreOriginal(stored.originalName());e.setNombreInterno(stored.internalName());
             e.setTipoMime(stored.mimeType());e.setTamanoBytes(stored.size());e.setDescripcion(blank(descripcion));e.setCreadoPor(user);e.setFechaHora(now());
-            e=evidencias.save(e);d.setUpdatedAt(now());evento(d,"EVIDENCIA_AGREGADA","Evidencia agregada: "+stored.originalName(),null,map("evidenciaId",e.getId(),"tipo",tipo.name(),"nombre",stored.originalName()),username);
+            e=evidencias.save(e);d.setUpdatedAt(now());evento(d,anexoActa?"ANEXO_ACTA_AGREGADO":"EVIDENCIA_AGREGADA",(anexoActa?"Anexo adicional del acta agregado: ":"Evidencia agregada: ")+stored.originalName(),null,map("evidenciaId",e.getId(),"tipo",tipo.name(),"nombre",stored.originalName()),username);
             return evidencia(e);
         }catch(RuntimeException ex){storage.delete(stored.internalName());throw ex;}
+    }
+
+    @Transactional
+    public void retirarEvidencia(Long id,Long evidenciaId,String motivo,String username){
+        var d=diligenciaBloqueada(id);var user=usuario(username);validarPropiedad(d.getProgramacion(),user);editable(d);
+        if(motivo==null||motivo.isBlank()||motivo.trim().length()>500)throw new ConflictException("Indica un motivo de retirada de hasta 500 caracteres.");
+        var e=evidencias.findByIdAndDiligenciaIdAndRetiradoEnIsNull(evidenciaId,id)
+                .orElseThrow(()->new NotFoundException("Documento de evidencia no encontrado o ya retirado."));
+        e.setRetiradoEn(now());e.setRetiradoPor(user);e.setMotivoRetiro(motivo.trim());
+        evidencias.save(e);d.setUpdatedAt(now());
+        evento(d,"EVIDENCIA_RETIRADA","Evidencia retirada: "+e.getNombreOriginal(),null,
+                map("evidenciaId",e.getId(),"nombre",e.getNombreOriginal(),"motivo",e.getMotivoRetiro()),username);
     }
 
     @Transactional
@@ -194,7 +246,6 @@ public class DiligenciaFiscalizacionService {
         var d=diligenciaBloqueada(id);var user=usuario(username);validarPropiedad(d.getProgramacion(),user);editable(d);
         if(d.getFechaInicio()==null)throw new ConflictException("La diligencia debe tener hora de inicio.");
         if(d.getProgramacion().getEstadoProgramacion()!=EstadoProgramacion.EN_CURSO)throw new ConflictException("La programación ya no está en curso.");
-        if(blank(d.getHechosConstatados())==null)throw new ConflictException("Registra los hechos constatados antes de finalizar.");
         if(d.getSituacionPersona()==null||d.getSituacionPersona()==SituacionPersona.PENDIENTE)
             throw new ConflictException("Indica quién atendió o deja constancia de su ausencia o negativa a identificarse.");
         if(d.getSituacionPersona()==SituacionPersona.IDENTIFICADA&&
@@ -202,26 +253,28 @@ public class DiligenciaFiscalizacionService {
             throw new ConflictException("Completa la identificación y condición de la persona presente.");
         if(d.getSituacionPersona()==SituacionPersona.SE_NEGO_A_IDENTIFICARSE&&blank(d.getPersonaObservaciones())==null)
             throw new ConflictException("Describe la negativa a identificarse.");
-        if((r.firmaFiscalizado()==EstadoFirmaActa.SE_NEGO_A_FIRMAR||r.firmaFiscalizado()==EstadoFirmaActa.SE_NEGO_A_IDENTIFICARSE)&&blank(r.observacionFirma())==null)
+        EstadoFirmaActa firma = r.firmaFiscalizado()==null?EstadoFirmaActa.FIRMA_PENDIENTE:r.firmaFiscalizado();
+        MedioEntrega medio = r.medioEntrega()==null?MedioEntrega.PENDIENTE:r.medioEntrega();
+        if((firma==EstadoFirmaActa.SE_NEGO_A_FIRMAR||firma==EstadoFirmaActa.SE_NEGO_A_IDENTIFICARSE)&&blank(r.observacionFirma())==null)
             throw new ConflictException("Registra la constancia de la negativa.");
-        if(r.firmaFiscalizado()==EstadoFirmaActa.SE_NEGO_A_IDENTIFICARSE&&d.getSituacionPersona()!=SituacionPersona.SE_NEGO_A_IDENTIFICARSE)
+        if(firma==EstadoFirmaActa.SE_NEGO_A_IDENTIFICARSE&&d.getSituacionPersona()!=SituacionPersona.SE_NEGO_A_IDENTIFICARSE)
             throw new ConflictException("La negativa a identificarse debe quedar consignada como situación de la persona presente.");
-        if(r.copiaEntregada()&&r.medioEntrega()==MedioEntrega.PENDIENTE)throw new ConflictException("Indica cómo se entregó la copia del acta.");
+        if(r.copiaEntregada()&&medio==MedioEntrega.PENDIENTE)throw new ConflictException("Indica cómo se entregó la copia del acta.");
         var close=gps(r.estadoGpsCierre(),r.latitudCierre(),r.longitudCierre());LocalDateTime now=now();
         d.setFechaCierre(now);d.setLatitudCierre(close.lat);d.setLongitudCierre(close.lon);d.setGpsCierreEstado(close.status);
-        d.setEstado(EstadoDiligencia.FINALIZADA);d.setCopiaEntregada(r.copiaEntregada());d.setMedioEntrega(r.medioEntrega());d.setUpdatedAt(now);
+        d.setEstado(EstadoDiligencia.FINALIZADA);d.setCopiaEntregada(r.copiaEntregada());d.setMedioEntrega(medio);d.setUpdatedAt(now);
         var p=d.getProgramacion();p.setEstadoProgramacion(EstadoProgramacion.REALIZADA);d.getExpediente().setEstado(EstadoExpediente.PENDIENTE_REVISION);
         var acta=new ActaFiscalizacion();acta.setCodigo("TMP"+UUID.randomUUID().toString().substring(0,20));acta.setDiligencia(d);
-        acta.setFirmaFiscalizadoEstado(r.firmaFiscalizado());acta.setFirmaFiscalizadoObservacion(blank(r.observacionFirma()));acta.setGeneradoPor(user);acta.setGeneradoEn(now);
+        acta.setFirmaFiscalizadoEstado(firma);acta.setFirmaFiscalizadoObservacion(blank(r.observacionFirma()));acta.setGeneradoPor(user);acta.setGeneradoEn(now);
         acta.setPdfGeneradoNombre("Acta-"+d.getExpediente().getCodigo()+".pdf");acta.setPdfGeneradoInterno("pending-"+UUID.randomUUID()+".pdf");acta.setContenidoJson("{}");
         actas.saveAndFlush(acta);acta.setCodigo("ACT-"+now.getYear()+"-"+String.format("%05d",acta.getId()));
-        Map<String,Object> snapshot=snapshot(d,acta.getCodigo(),r.firmaFiscalizado().name(),blank(r.observacionFirma()));
+        Map<String,Object> snapshot=snapshot(d,acta.getCodigo(),firma.name(),blank(r.observacionFirma()));
         try{acta.setContenidoJson(json.writeValueAsString(snapshot));}catch(Exception ex){throw new IllegalStateException("No se pudo serializar el acta.",ex);}
         var stored=storage.storeGeneratedPdf(pdf.generar(snapshot),acta.getPdfGeneradoNombre());acta.setPdfGeneradoInterno(stored.internalName());
         var revision=new RevisionFiscalizacion();revision.setExpediente(d.getExpediente());revision.setDiligencia(d);revision.setActa(acta);revision.setEstadoRevision(EstadoRevision.PENDIENTE);revision.setRequiereSeguimiento(false);revision.setRequiereDerivacion(false);revision.setCreadoEn(now);revision.setActualizadoEn(now);revisiones.save(revision);
         evento(d,"DILIGENCIA_FINALIZADA","Diligencia finalizada y programación marcada REALIZADA",map("estado","EN_DESARROLLO"),map("estado","FINALIZADA"),username);
         evento(d,"ACTA_GENERADA","Acta de Fiscalización generada: "+acta.getCodigo(),null,map("actaId",acta.getId(),"codigo",acta.getCodigo()),username);
-        if(r.copiaEntregada())evento(d,"COPIA_ENTREGADA","Se dejó constancia de entrega de copia por medio "+r.medioEntrega().name(),null,map("medio",r.medioEntrega().name()),username);
+        if(r.copiaEntregada())evento(d,"COPIA_ENTREGADA","Se dejó constancia de entrega de copia por medio "+medio.name(),null,map("medio",medio.name()),username);
         return actaResponse(acta,snapshot);
     }
 
@@ -257,7 +310,7 @@ public class DiligenciaFiscalizacionService {
         if(file==null)throw new NotFoundException("No existe documento de sustento.");return new FileDownload(file,e.getDocumentoSustentoNombre()==null?"sustento.pdf":e.getDocumentoSustentoNombre(),"application/pdf");}
 
     @Transactional(readOnly=true)
-    public FileDownload evidencia(Long id,Long evidenciaId,String username,boolean ownOnly){var e=evidencias.findByIdAndDiligenciaId(evidenciaId,id).orElseThrow(()->new NotFoundException("Evidencia no encontrada."));if(ownOnly)requireOwner(e.getDiligencia().getProgramacion(),username);Resource file=storage.load(e.getNombreInterno());if(file==null)throw new NotFoundException("Archivo de evidencia no encontrado.");return new FileDownload(file,e.getNombreOriginal(),e.getTipoMime());}
+    public FileDownload evidencia(Long id,Long evidenciaId,String username,boolean ownOnly){var e=evidencias.findByIdAndDiligenciaIdAndRetiradoEnIsNull(evidenciaId,id).orElseThrow(()->new NotFoundException("Evidencia no encontrada."));if(ownOnly)requireOwner(e.getDiligencia().getProgramacion(),username);Resource file=storage.load(e.getNombreInterno());if(file==null)throw new NotFoundException("Archivo de evidencia no encontrado.");return new FileDownload(file,e.getNombreOriginal(),e.getTipoMime());}
 
     @Transactional(readOnly=true)
     public FileDownload evidenciaActa(Long actaId,Long evidenciaId,String username,boolean ownOnly){var a=actas.findById(actaId).orElseThrow(()->new NotFoundException("Acta no encontrada."));return evidencia(a.getDiligencia().getId(),evidenciaId,username,ownOnly);}
@@ -265,7 +318,7 @@ public class DiligenciaFiscalizacionService {
     private DiligenciaFiscalizacion diligenciaBloqueada(Long id){return diligencias.findByIdForUpdate(id).orElseThrow(()->new NotFoundException("Diligencia no encontrada."));}
     private DiligenciaWorkspaceResponse workspace(ProgramacionFiscalizacion p,DiligenciaFiscalizacion d){
         var e=p.getExpediente();var ps=d==null?List.<ParticipanteResponse>of():participantes.findAllByDiligenciaIdOrderByCreadoEnAscIdAsc(d.getId()).stream().map(this::participante).toList();
-        var es=d==null?List.<EvidenciaResponse>of():evidencias.findAllByDiligenciaIdOrderByFechaHoraAscIdAsc(d.getId()).stream().map(this::evidencia).toList();
+        var es=d==null?List.<EvidenciaResponse>of():evidencias.findAllByDiligenciaIdAndRetiradoEnIsNullOrderByFechaHoraAscIdAsc(d.getId()).stream().map(this::evidencia).toList();
         ActaResumenResponse brief=d==null||d.getActa()==null?null:new ActaResumenResponse(d.getActa().getId(),d.getActa().getCodigo(),d.getActa().getFirmaFiscalizadoEstado().name(),d.getActa().getPdfGeneradoNombre(),d.getActa().getPdfFirmadoNombre(),d.getActa().getGeneradoEn());
         return new DiligenciaWorkspaceResponse(d==null?null:d.getId(),e.getCodigo(),e.getOrigen().name(),e.getObjetoFiscalizacion(),e.getObservacionesIniciales(),
                 e.getNombreAdministrado()==null?"":e.getNombreAdministrado()+(e.getAdministradoApellidos()==null?"":" "+e.getAdministradoApellidos()),
@@ -287,7 +340,7 @@ public class DiligenciaFiscalizacionService {
     private Map<String,Object> snapshot(DiligenciaFiscalizacion d,String code,String signature,String signatureNote){var e=d.getExpediente();var map=new LinkedHashMap<String,Object>();map.put("actaCodigo",code);map.put("expedienteCodigo",e.getCodigo());map.put("origen",e.getOrigen().name());map.put("administrado",e.getNombreAdministrado()==null?"":e.getNombreAdministrado()+" "+(e.getAdministradoApellidos()==null?"":e.getAdministradoApellidos()));map.put("documentoAdministrado",e.getDocumentoAdministrado());map.put("lugar",d.getLugarDiligencia());map.put("fecha",d.getFechaInicio().toLocalDate().toString());map.put("fechaInicio",d.getFechaInicio().toString());map.put("fechaCierre",d.getFechaCierre().toString());map.put("registroPosterior",d.isRegistroPosterior());map.put("registradoEn",d.getRegistradoEn());map.put("registradoPor",d.getRegistradoPor()==null?null:d.getRegistradoPor().getUsername());map.put("fechaHoraEjecucion",d.getFechaHoraEjecucion());map.put("origenHoraEjecucion",d.getOrigenHoraEjecucion()==null?null:d.getOrigenHoraEjecucion().name());map.put("tipoVisita",d.getProgramacion().getTipoVisita().name());map.put("objetoFiscalizacion",e.getObjetoFiscalizacion());map.put("observacionesPrevias",e.getObservacionesIniciales());map.put("fiscalizadorResponsable",d.getFiscalizadorResponsable().getNombre());map.put("situacionPersona",d.getSituacionPersona().name());map.put("personaNombres",d.getPersonaNombres());map.put("personaApellidos",d.getPersonaApellidos());map.put("personaTipoDocumento",d.getPersonaTipoDocumento());map.put("personaNumeroDocumento",d.getPersonaNumeroDocumento());map.put("personaCondicion",d.getPersonaCondicion());map.put("personaObservaciones",d.getPersonaObservaciones());map.put("hechosConstatados",d.getHechosConstatados());map.put("ocurrencias",d.getOcurrencias());map.put("observacionesFiscalizador",d.getObservacionesFiscalizador());map.put("observacionesFiscalizado",d.getObservacionesFiscalizado());map.put("firmaFiscalizadoEstado",signature);map.put("firmaFiscalizadoObservacion",signatureNote);map.put("copiaEntregada",d.isCopiaEntregada());map.put("medioEntrega",d.getMedioEntrega().name());map.put("gpsInicioEstado",d.getGpsInicioEstado().name());map.put("latitudInicio",d.getLatitudInicio());map.put("longitudInicio",d.getLongitudInicio());map.put("gpsCierreEstado",d.getGpsCierreEstado().name());map.put("latitudCierre",d.getLatitudCierre());map.put("longitudCierre",d.getLongitudCierre());
         if(d.isRegistroPosterior()&&d.getFechaHoraEjecucion()!=null){map.put("fecha",d.getFechaHoraEjecucion().toLocalDate().toString());map.put("fechaInicio",d.getFechaHoraEjecucion().toString());}
         map.put("participantes",participantes.findAllByDiligenciaIdOrderByCreadoEnAscIdAsc(d.getId()).stream().map(p->{var x=new LinkedHashMap<String,Object>();x.put("tipoParticipante",p.getTipoParticipante().name());x.put("nombre",p.getNombre());x.put("apellidos",p.getApellidos());x.put("tipoDocumento",p.getTipoDocumento());x.put("numeroDocumento",p.getNumeroDocumento());x.put("entidadArea",p.getEntidadArea());x.put("cargoCondicion",p.getCargoCondicion());return x;}).toList());
-        map.put("evidencias",evidencias.findAllByDiligenciaIdOrderByFechaHoraAscIdAsc(d.getId()).stream().map(v->{var x=new LinkedHashMap<String,Object>();x.put("tipo",v.getTipo().name());x.put("nombreOriginal",v.getNombreOriginal());x.put("tipoMime",v.getTipoMime());x.put("descripcion",v.getDescripcion());return x;}).toList());return map;}
+        map.put("evidencias",evidencias.findAllByDiligenciaIdAndRetiradoEnIsNullOrderByFechaHoraAscIdAsc(d.getId()).stream().map(v->{var x=new LinkedHashMap<String,Object>();x.put("tipo",v.getTipo().name());x.put("nombreOriginal",v.getNombreOriginal());x.put("tipoMime",v.getTipoMime());x.put("descripcion",v.getDescripcion());return x;}).toList());return map;}
     private void evento(DiligenciaFiscalizacion d,String type,String description,Map<String,?> before,Map<String,?> after,String username){var h=new ExpedienteHistorial();h.setExpediente(d.getExpediente());h.setProgramacion(d.getProgramacion());h.setFechaHora(now());h.setActorUsername(username);h.setActor(usuarios.findByUsernameIgnoreCaseAndActivoTrue(username).orElse(null));h.setTipoEvento(type);h.setDescripcion(description);h.setValoresAnteriores(serialize(before));h.setValoresNuevos(serialize(after));historial.save(h);}
     private void evento(ExpedienteFiscalizacion expediente,ProgramacionFiscalizacion programacion,String type,String description,Map<String,?> before,Map<String,?> after,String username){var h=new ExpedienteHistorial();h.setExpediente(expediente);h.setProgramacion(programacion);h.setFechaHora(now());h.setActorUsername(username);h.setActor(usuarios.findByUsernameIgnoreCaseAndActivoTrue(username).orElse(null));h.setTipoEvento(type);h.setDescripcion(description);h.setValoresAnteriores(serialize(before));h.setValoresNuevos(serialize(after));historial.save(h);}
     private String serialize(Object value){if(value==null)return null;try{return json.writeValueAsString(value);}catch(Exception e){throw new IllegalStateException(e);}}
