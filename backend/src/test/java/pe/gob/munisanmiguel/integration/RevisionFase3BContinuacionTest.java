@@ -1,7 +1,6 @@
 package pe.gob.munisanmiguel.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,15 +23,17 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Continues the persisted fixture without recreating any expediente or prior cycle. */
+/** Persists its own isolated first cycle, then verifies continuation preserves it. */
+@org.junit.jupiter.api.condition.EnabledIfSystemProperty(named="municipal.integration", matches="true")
+@org.springframework.test.context.ContextConfiguration(initializers=IsolatedDatabaseInitializer.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = {
-        "spring.datasource.url=jdbc:mysql://localhost:3307/san_miguel_pruebas_v20?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=utf8",
+        "spring.datasource.url=${municipal.test.jdbc-url}",
         "app.storage.diligencias-path=target/fase3b-integrada/diligencias",
         "app.storage.path=target/fase3b-integrada/solicitudes"
 })
 class RevisionFase3BContinuacionTest {
-    private static final String MARKER = "VALIDACION_REVISION_FASE3B_INTEGRADA";
+    private final String MARKER = "VALIDACION_CONTINUACION_FASE3B_"+UUID.randomUUID().toString().substring(0,8);
     private static final ZoneId LIMA = ZoneId.of("America/Lima");
 
     @Autowired TestRestTemplate http;
@@ -51,31 +52,33 @@ class RevisionFase3BContinuacionTest {
     @Autowired PasswordEncoder encoder;
     @Autowired FiscalizacionFileStorageService storage;
 
+    private final String ownerIdentity="T-"+UUID.randomUUID().toString().substring(0,8);
+    private final String otherIdentity="T-"+UUID.randomUUID().toString().substring(0,8);
     private final List<String> temporaryAccounts = new ArrayList<>();
     private final Map<String,String> passwords = new HashMap<>();
     private final Map<String,String> usernames = new HashMap<>();
 
     @Test
     void continuaFixturePersistidoConJwtRealHastaCierre() throws Exception {
-        List<ExpedienteFiscalizacion> marked = expedientes.findAll().stream().filter(e ->
-                Objects.toString(e.getObservacionesIniciales(), "").contains(MARKER)
-                        || Objects.toString(e.getDetalleOrigen(), "").contains(MARKER)).toList();
-        Assumptions.assumeTrue(marked.size() == 1, "No hay un único fixture integrado ya persistido que continuar.");
-        ExpedienteFiscalizacion fixture = marked.get(0);
-        Assumptions.assumeFalse(fixture.getEstado() == EstadoExpediente.CERRADO,
-                "El fixture ya está cerrado y validado; no se vuelve a operar ni duplicar.");
-
         try {
-            reactivatePriorSyntheticReviewers(fixture.getId());
             createUser("f3b_admin", Rol.ADMIN_SISTEMA, "ADMIN_SISTEMA", null);
             createUser("f3b_municipio", Rol.MUNICIPIO, "MUNICIPIO", null);
-            createUser("f3b_fiscal_propietario", Rol.FISCALIZADOR, "FISCALIZADOR", "FIS-001");
-            createUser("f3b_fiscal_ajeno", Rol.FISCALIZADOR, "FISCALIZADOR", "FIS-002");
+            createUser("f3b_fiscal_propietario", Rol.FISCALIZADOR, "FISCALIZADOR", ownerIdentity);
+            createUser("f3b_fiscal_ajeno", Rol.FISCALIZADOR, "FISCALIZADOR", otherIdentity);
             String admin = login("f3b_admin"), municipality = login("f3b_municipio");
             String owner = login("f3b_fiscal_propietario"), other = login("f3b_fiscal_ajeno");
+            var initial=body(call(HttpMethod.POST,"/api/expedientes",municipality,expedienteRequest(MARKER)),HttpStatus.CREATED);
+            String initialCode=initial.path("codigo").asText();
+            var initialVisit=body(call(HttpMethod.POST,"/api/expedientes/"+initialCode+"/programaciones",municipality,
+                    Map.of("fiscalizadorId",ownerIdentity,"fecha",LocalDate.now(LIMA).toString(),"hora","10:00","tipoVisita","PROGRAMADA")),HttpStatus.CREATED);
+            long firstDiligence=runDiligence(initialVisit.path("id").asLong(),"primera diligencia sintética",owner,other);
+            var firstReview=body(call(HttpMethod.POST,"/api/revisiones/diligencias/"+firstDiligence+"/iniciar",municipality,null),HttpStatus.OK);
+            body(call(HttpMethod.POST,"/api/revisiones/"+firstReview.path("revision").path("id").asLong()+"/aclaraciones",municipality,
+                    Map.of("mensaje","Aclaración sintética pendiente para verificar continuidad.")),HttpStatus.OK);
+            ExpedienteFiscalizacion fixture=expedientes.findByCodigo(initialCode).orElseThrow();
 
             String code = fixture.getCodigo(); long expedienteId = fixture.getId();
-            LocalDate future = LocalDate.now(LIMA).plusDays(30);
+            LocalDate future = LocalDate.now(LIMA);
             List<ProgramacionFiscalizacion> cycles = programaciones.findAllByExpedienteIdOrderByIdAsc(expedienteId);
             assertEquals(1, cycles.size(), "La continuación parte del único ciclo ya guardado.");
             long prog1 = cycles.get(0).getId();
@@ -141,7 +144,7 @@ class RevisionFase3BContinuacionTest {
             }
             assertEquals(1, followups.size());
             long prog2 = followups.get(0).path("id").asLong();
-            assertEquals("VALIDACION_REVISION_FASE3B_INTEGRADA: verificar implementación de mejora", followups.get(0).path("motivo").asText());
+            assertEquals(MARKER+": verificar implementación de mejora", followups.get(0).path("motivo").asText());
             assertEquals(rev1, jdbc.queryForObject("SELECT revision_origen_id FROM programacion_fiscalizacion WHERE id=?", Long.class, prog2));
             assertEquals(expedienteId, jdbc.queryForObject("SELECT expediente_id FROM programacion_fiscalizacion WHERE id=?", Long.class, prog2));
             assertStatus(call(HttpMethod.POST, "/api/revisiones/" + rev1 + "/seguimientos", municipality, followup(future.plusDays(1))), HttpStatus.CONFLICT);
@@ -164,7 +167,7 @@ class RevisionFase3BContinuacionTest {
 
             // Check all ordinary post-close mutations use the implemented 409 protection.
             assertStatus(call(HttpMethod.POST, "/api/expedientes/" + code + "/programaciones", municipality,
-                    Map.of("fiscalizadorId", "FIS-001", "fecha", future.plusDays(4).toString(), "hora", "12:00", "tipoVisita", "PROGRAMADA")), HttpStatus.CONFLICT);
+                    Map.of("fiscalizadorId", ownerIdentity, "fecha", future.plusDays(4).toString(), "hora", "12:00", "tipoVisita", "PROGRAMADA")), HttpStatus.CONFLICT);
             assertStatus(call(HttpMethod.POST, "/api/programaciones/" + prog2 + "/reprogramar", municipality,
                     Map.of("fecha", future.plusDays(5).toString(), "hora", "12:00", "motivo", "Prueba de bloqueo", "tipoVisita", "PROGRAMADA")), HttpStatus.CONFLICT);
             assertStatus(call(HttpMethod.POST, "/api/programaciones/" + prog2 + "/cancelar", municipality, Map.of("motivo", "Prueba de bloqueo")), HttpStatus.CONFLICT);
@@ -245,7 +248,7 @@ class RevisionFase3BContinuacionTest {
         payload.put("plazoConclusion", deadline); return payload;
     }
     private Object followup(LocalDate date) {
-        return Map.of("fecha", date.toString(), "hora", "11:00", "tipoVisita", "PROGRAMADA", "fiscalizadorId", "FIS-001",
+        return Map.of("fecha", date.toString(), "hora", "11:00", "tipoVisita", "PROGRAMADA", "fiscalizadorId", ownerIdentity,
                 "motivo", MARKER + ": verificar implementación de mejora");
     }
     private Object expedienteRequest(String notes) {
@@ -260,17 +263,12 @@ class RevisionFase3BContinuacionTest {
         AppUser user = new AppUser(); user.setUsername(username); user.setPasswordHash(encoder.encode(password)); user.setDisplayName("Fixture técnico " + roleName);
         user.setCargo("Validación Fase 3B"); user.setRole(legacyRole); user.getRoles().add(roles.findByName(roleName).orElseThrow());
         user.setActivo(true); user.setCreatedAt(LocalDateTime.now(LIMA));
-        if (fiscalizadorId != null) user.setFiscalizador(fiscalizadores.findById(fiscalizadorId).orElseThrow());
-        users.saveAndFlush(user); temporaryAccounts.add(username); passwords.put(prefix, password); usernames.put(prefix, username);
-    }
-    private void reactivatePriorSyntheticReviewers(long expedienteId) {
-        List<String> reviewers = jdbc.queryForList("SELECT DISTINCT u.username FROM revision_fiscalizacion r JOIN app_user u ON u.id=r.revisor_id WHERE r.expediente_id=?", String.class, expedienteId);
-        for (String username : reviewers) {
-            if (!username.startsWith("f3b_municipio_")) continue;
-            AppUser prior = users.findByUsernameIgnoreCase(username).orElseThrow();
-            prior.setPasswordHash(encoder.encode(UUID.randomUUID() + "-T3mp!")); prior.setActivo(true);
-            users.saveAndFlush(prior); temporaryAccounts.add(username);
+        if (fiscalizadorId != null) {
+            var identity=new Fiscalizador();identity.setId(fiscalizadorId);identity.setCodigo(fiscalizadorId);
+            identity.setNombre(username);identity.setZona("Pruebas aisladas");identity.setTelefono("");identity.setActivo(true);identity.setMunicipioResponsable(users.findByUsernameIgnoreCase(temporaryAccounts.stream().filter(n->n.startsWith("f3b_municipio_")).findFirst().orElseThrow()).orElseThrow());
+            user.setFiscalizador(fiscalizadores.saveAndFlush(identity));
         }
+        users.saveAndFlush(user); temporaryAccounts.add(username); passwords.put(prefix, password); usernames.put(prefix, username);
     }
     private String login(String prefix) {
         String username = usernames.get(prefix);

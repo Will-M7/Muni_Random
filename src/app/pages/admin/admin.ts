@@ -2,7 +2,7 @@ import {ChangeDetectorRef,Component,OnInit} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import {HttpErrorResponse} from '@angular/common/http';
-import {IdentityConfiguration,IdentityDniQuota,IdentityDniTestResult,UserPreferences,Usuario,UsuarioNuevo,UsuariosService,UsuarioEliminacion} from '../../services/usuarios.service';
+import {FiscalizadorGestion,IdentityConfiguration,IdentityDniQuota,IdentityDniTestResult,UserPreferences,Usuario,UsuarioNuevo,UsuariosService,UsuarioEliminacion} from '../../services/usuarios.service';
 import {AuthService} from '../../services/auth.service';
 
 @Component({selector:'app-admin',imports:[CommonModule,FormsModule],templateUrl:'./admin.html',styleUrl:'./admin.css'})
@@ -16,7 +16,12 @@ export class AdminComponent implements OnInit {
   apiKey='';clientId='';clientSecret='';limite=5;cargando=false;guardando=false;mensaje='';error='';seleccionados=new Set<string>();dniPrueba='';probandoDni=false;resultadoDni:IdentityDniTestResult|null=null;errorDni='';cuotaDni:IdentityDniQuota|null=null;cargandoCuota=false;
   constructor(private service:UsuariosService,private auth:AuthService,private cdr:ChangeDetectorRef){}
   async ngOnInit(){await Promise.all([this.cargarUsuarios(),this.cargarParametros()]);}
-  async cargarUsuarios(){this.cargando=true;try{this.usuarios=await this.service.listar(this.filtro);this.seleccionados.clear();}catch(e){this.error=this.errorMessage(e,'No se pudo cargar la lista de usuarios.');}finally{this.cargando=false;this.cdr.markForCheck();}}
+  municipalesGestion:Usuario[]=[];asignaciones:FiscalizadorGestion[]=[];responsables:Record<string,string>={};errorAsignaciones='';asignando:string|null=null;
+  get municipalesActivos(){return this.municipalesGestion;}
+  responsableActivo(username:string){return this.municipalesActivos.some(u=>u.username===username);}
+  async cargarAsignaciones(){this.errorAsignaciones='';try{[this.asignaciones,this.municipalesGestion]=await Promise.all([this.service.gestionFiscalizadores(),this.service.municipalesGestion()]);this.responsables=Object.fromEntries(this.asignaciones.map(f=>[f.id,f.municipioUsername??'']));}catch{this.errorAsignaciones='No se pudo cargar la asignación de fiscalizadores. Reintenta.';}this.cdr.markForCheck();}
+  async asignarResponsable(f:FiscalizadorGestion){this.errorAsignaciones='';this.asignando=f.id;try{Object.assign(f,await this.service.asignarResponsableMunicipal(f.id,this.responsables[f.id]||null));this.mensaje='Responsable municipal actualizado. La identidad de acceso y los expedientes históricos se conservan.';}catch(e){this.errorAsignaciones=this.errorMessage(e,'No se pudo actualizar el responsable municipal.');}finally{this.asignando=null;this.cdr.markForCheck();}}
+  async cargarUsuarios(){this.cargando=true;try{this.usuarios=await this.service.listar(this.filtro);this.seleccionados.clear();await this.cargarAsignaciones();}catch(e){this.error=this.errorMessage(e,'No se pudo cargar la lista de usuarios.');}finally{this.cargando=false;this.cdr.markForCheck();}}
   async cambiarFiltro(value:'activos'|'archivados'|'todos'){this.filtro=value;await this.cargarUsuarios();}
   async cargarParametros(){try{[this.integracion,this.limite]=await Promise.all([this.service.integracion(),this.service.limiteDiario()]);this.proveedorGuardado=this.integracion.provider;}catch{this.error='No se pudo cargar la configuración.';}await this.cargarCuotaDni();this.cdr.markForCheck();}
   async cargarCuotaDni(){this.cargandoCuota=true;try{this.cuotaDni=await this.service.cuotaDni();}catch{this.cuotaDni=null;}finally{this.cargandoCuota=false;this.cdr.markForCheck();}}

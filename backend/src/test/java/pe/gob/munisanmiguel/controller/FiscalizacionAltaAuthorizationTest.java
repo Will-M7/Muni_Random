@@ -23,6 +23,8 @@ import static org.hamcrest.Matchers.containsString;
 @WebMvcTest(FiscalizacionAltaController.class)
 @Import(SecurityConfig.class)
 class FiscalizacionAltaAuthorizationTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean pe.gob.munisanmiguel.service.MunicipalAccessService municipalAccess;
+
     @Autowired MockMvc mvc;
     @MockitoBean AltaFiscalizacionService service;
     @MockitoBean JwtService jwt;

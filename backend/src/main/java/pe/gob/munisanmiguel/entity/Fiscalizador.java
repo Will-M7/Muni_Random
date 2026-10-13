@@ -11,4 +11,5 @@ public class Fiscalizador {
     @Column(nullable = false, length = 180) private String zona;
     @Column(nullable = false, length = 30) private String telefono;
     @Column(nullable = false) private boolean activo;
+    @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="municipio_responsable_id") private AppUser municipioResponsable;
 }

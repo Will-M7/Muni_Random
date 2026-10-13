@@ -22,6 +22,8 @@ public class BootstrapAdmin implements ApplicationRunner {
     private final AdminSettingsService settings;
     private final String username;
     private final String password;
+    @Value("${app.bootstrap-admin.only-empty-database:false}")
+    private boolean onlyEmptyDatabase;
 
     public BootstrapAdmin(AppUserRepository users, AppRoleRepository roles, PasswordEncoder encoder,AdminSettingsService settings,
                           @Value("${app.bootstrap-admin.username:}") String username,
@@ -30,6 +32,7 @@ public class BootstrapAdmin implements ApplicationRunner {
     }
 
     @Override @Transactional public void run(ApplicationArguments args) {
+        if (onlyEmptyDatabase && users.count() != 0) return;
         if (username.isBlank() || password.length() < 8 || users.findByUsernameIgnoreCase(username.trim()).isPresent()) return;
         var user=new AppUser(); user.setUsername(username.trim()); user.setPasswordHash(encoder.encode(password));
         user.setDisplayName("Administrador del sistema"); user.setCargo("Administración del sistema");

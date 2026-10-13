@@ -45,6 +45,8 @@ public class UserHistoryService {
                 (rs, row) -> new String[]{rs.getString(1), rs.getString(2)}, target, targetColumn);
         List<String> found = new ArrayList<>();
         for (String[] ref : columns) {
+            // The account's own identity link is not an operation or historical assignment.
+            if (target.equals("fiscalizador") && ref[0].equals("app_user")) continue;
             if (excludeTechnical && (ref[0].equals("user_role") || ref[0].equals("user_preference"))) continue;
             String table = "`" + ref[0].replace("`", "``") + "`";
             String column = "`" + ref[1].replace("`", "``") + "`";

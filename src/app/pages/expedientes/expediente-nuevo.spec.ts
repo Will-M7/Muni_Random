@@ -6,6 +6,7 @@ import { expect, vi } from 'vitest';
 import { ExpedienteNuevoComponent } from './expediente-nuevo';
 import { VerificacionService } from '../../services/verificacion.service';
 import { ReniecService } from '../../services/reniec.service';
+import { AuthService } from '../../services/auth.service';
 import { UsuariosService } from '../../services/usuarios.service';
 
 describe('ExpedienteNuevoComponent consulta manual de DNI', () => {
@@ -15,20 +16,20 @@ describe('ExpedienteNuevoComponent consulta manual de DNI', () => {
   let api: any;
   beforeEach(async () => {
     reniec = { consultarDni: vi.fn().mockReturnValue(of({ dni: '00000000', nombres: 'NOMBRE FICTICIO', apellidoPaterno: 'APELLIDO', apellidoMaterno: 'PRUEBA' })) };
-    api = { obtenerFiscalizadores: vi.fn().mockResolvedValue([]), crearFiscalizacion: vi.fn().mockResolvedValue({ codigo: 'FIS-TEST' }), resolverGoogleMaps: vi.fn() };
+    api = { obtenerFiscalizadores: vi.fn().mockResolvedValue([]), agendaMensual:vi.fn().mockResolvedValue({mes:'2026-10',limite:5,visitas:[],dias:[]}), crearFiscalizacion: vi.fn().mockResolvedValue({ codigo: 'FIS-TEST' }), resolverGoogleMaps: vi.fn() };
     const users = { misPreferencias: vi.fn().mockResolvedValue({ mapaInterno: true, googleExterno: true, googleUrl: true, descargarJornadaHtml: true }), limiteDiario: vi.fn().mockResolvedValue(5), cuotaDni: vi.fn().mockResolvedValue({ applies: true, provider: 'PERUAPI_COM', date: '2026-10-09', used: 44, limit: 45, remaining: 1, exhausted: false, resetsAt: '2026-10-10T00:00:00-05:00', zone: 'America/Lima' }) };
     await TestBed.configureTestingModule({ imports: [ExpedienteNuevoComponent], providers: [
-      { provide: VerificacionService, useValue: api }, { provide: ReniecService, useValue: reniec }, { provide: UsuariosService, useValue: users }, provideRouter([]),
+      {provide:AuthService,useValue:{session:{rol:'MUNICIPIO',roles:['MUNICIPIO']}}}, { provide: VerificacionService, useValue: api }, { provide: ReniecService, useValue: reniec }, { provide: UsuariosService, useValue: users }, provideRouter([]),
     ] }).compileComponents();
     fixture = TestBed.createComponent(ExpedienteNuevoComponent); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
     component = fixture.componentInstance;
   });
 
-  it('conserva el tipo de visita y los datos del borrador al regresar del mapa', () => {
+  it('normaliza a PROGRAMADA los borradores antiguos y conserva sus demás datos al regresar del mapa', () => {
     sessionStorage.setItem('sm_expediente_nuevo_borrador', JSON.stringify({tipoVisita:'INOPINADA',programar:true,direccion:'Jr. Tacna 123',nombres:'Nombre conservado'}));
     try {
       component.restaurarBorrador();
-      expect(component.tipoVisita).toBe('INOPINADA');
+      expect(component.tipoVisita).toBe('PROGRAMADA');
       expect(component.programar).toBe(true);
       expect(component.direccion).toBe('Jr. Tacna 123');
       expect(component.nombres).toBe('Nombre conservado');
@@ -74,7 +75,7 @@ describe('ExpedienteNuevoComponent consulta manual de DNI', () => {
   });
 
   it('crea expediente de origen SOLICITUD sin enviar vínculo legacy', async () => {
-    component.origen = 'SOLICITUD'; component.solicitudCodigo = 'SOL-LEGACY'; component.dependenciaProcedencia = 'Gerencia Municipal'; component.referenciaSolicitud = 'MEMO-123';
+    component.origen = 'SOLICITUD'; component.solicitudCodigo = 'SOL-LEGACY'; component.referenciaSolicitud = 'MEMO-123';
     component.objetoFiscalizacion = 'Verificar licencia'; component.direccion = 'Jr. Principal 123'; component.administradoAplica = false;
     component.latitud = -15.4; component.longitud = -70.1; component.ubicacionConfirmada = true; component.metodoUbicacion = 'MAPA_INTERNO';
     await component.guardar();
@@ -163,4 +164,16 @@ describe('ExpedienteNuevoComponent consulta manual de DNI', () => {
     expect(component.archivos).toHaveLength(10);
     component.quitarArchivo(0); expect(component.archivos).toHaveLength(9);
   });
+  it('retira dependencia de procedencia del formulario y del payload',async()=>{
+    component.origen='SOLICITUD';component.referenciaSolicitud='REF-2026';component.objetoFiscalizacion='Verificación';component.direccion='Dirección registrada';component.administradoAplica=false;component.latitud=-15.4;component.longitud=-70.1;component.ubicacionConfirmada=true;component.metodoUbicacion='MAPA_INTERNO';await component.guardar();
+    expect(fixture.nativeElement.textContent).not.toContain('Dependencia de procedencia');expect(api.crearFiscalizacion.mock.calls[0][0].dependenciaProcedencia).toBeUndefined();
+  });
+  it('distingue error de conexión de métodos desactivados y permite reintentar',async()=>{
+    const users=TestBed.inject(UsuariosService) as any;users.misPreferencias.mockRejectedValueOnce(new HttpErrorResponse({status:0}));await component.cargarPreferencias();expect(component.preferenciasError).toContain('conectar con el backend');expect(component.sinMetodos).toBe(false);
+    users.misPreferencias.mockResolvedValueOnce({mapaInterno:false,googleExterno:false,googleUrl:false,descargarJornadaHtml:false});await component.cargarPreferencias();expect(component.preferenciasError).toBe('');expect(component.sinMetodos).toBe(true);
+  });
+  it('usa una consulta mensual y selecciona agenda sin consultas por celda',async()=>{
+    api.agendaMensual.mockResolvedValue({mes:'2026-11',limite:5,dias:[{fecha:'2026-11-03',carga:1}],visitas:[{fecha:'2026-11-03',hora:'10:00',estado:'PROGRAMADA',expedienteCodigo:'FIS-REAL',fiscalizadorId:'F1'}]});await component.cargarMes('2026-11');component.seleccionarFecha('2026-11-03');expect(component.cargaValida).toBe(1);expect(component.ocupacion['2026-11-03']).toBe(1);expect(component.agenda[0].expedienteCodigo).toBe('FIS-REAL');expect(api.agendaMensual).toHaveBeenLastCalledWith('2026-11');
+  });
+
 });

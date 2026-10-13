@@ -9,6 +9,7 @@ import { FiscalizadorTarea, VerificacionService } from '../../services/verificac
 import { ResultadoFiscalizacion } from '../../models/solicitud.model';
 import { todayPeru } from '../../core/date';
 import {UsuariosService} from '../../services/usuarios.service';
+import { visitKey,visitColor,visitPin } from '../../core/visit-identity';
 import { formatTimeDual } from '../../core/time';
 
 type Coordenadas = [number, number];
@@ -45,7 +46,7 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   reporte: File | null = null;
   resultado: ResultadoFiscalizacion = 'PENDIENTE';
   observaciones = '';
-  vista: 'panel' | 'ruta' | 'historial' = 'panel';
+  vista: 'panel' | 'ruta' | 'historial' | 'proximas' | 'detalle' = 'panel';
   historialFecha = '';
   historialResultado = 'TODOS';
   mapa?: L.Map;
@@ -67,7 +68,11 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   get noRealizadas() { return this.tareasDia.filter(t => t.resultado === 'NO_REALIZADA'); }
   get puntosRuta():TareaConCoordenadas[] { return this.pendientes.filter((t):t is TareaConCoordenadas=>this.coordenadasValidas(t)); }
   get sinCoordenadas():FiscalizadorTarea[]{return this.pendientes.filter(t=>!this.coordenadasValidas(t));}
-  get puntosMapa():TareaConCoordenadas[]{const unicos=new Map<string,TareaConCoordenadas>();for(const tarea of [...this.tareasDia,...this.proximas])if(this.coordenadasValidas(tarea))unicos.set(`${tarea.codigo}-${tarea.fecha}-${tarea.hora}`,tarea);return[...unicos.values()];}
+  get visitasMapa():FiscalizadorTarea[]{const unique=new Map<string,FiscalizadorTarea>();for(const t of [...this.rutaOrdenada,...this.sinCoordenadas,...this.tareasDia,...this.proximas])unique.set(visitKey(t),t);return [...unique.values()];}
+  get puntosMapa():TareaConCoordenadas[]{return this.visitasMapa.filter((t):t is TareaConCoordenadas=>this.coordenadasValidas(t));}
+  numeroVisita(tarea:FiscalizadorTarea){return this.visitasMapa.findIndex(t=>visitKey(t)===visitKey(tarea))+1;}
+  colorVisita(tarea:FiscalizadorTarea){return visitColor(this.numeroVisita(tarea));}
+  abrirVisita(tarea:FiscalizadorTarea){if(tarea.esExpediente)this.abrirDiligencia(tarea.programacionId);else void this.router.navigate(['/fiscalizador/visita',tarea.codigo]);}
   get distanciaRutaKm() { return this.calcularRuta().distanciaKm; }
   get rutaOrdenada() { return this.calcularRuta().orden; }
   cerrarSesion(): void { this.auth.logout(); void this.router.navigate(['/login']); }
@@ -86,7 +91,7 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy(): void { this.navigationSubscription?.unsubscribe(); this.mapa?.remove(); }
 
   private actualizarVista(url: string): void {
-    this.vista = url.includes('/historial') ? 'historial' : url.includes('/ruta') ? 'ruta' : 'panel';
+    this.vista = url.includes('/historial') ? 'historial' : url.includes('/proximas') ? 'proximas' : url.includes('/visita/') ? 'detalle' : url.includes('/ruta') ? 'ruta' : 'panel';
   }
 
   async cargar(): Promise<void> {
@@ -116,6 +121,7 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
         .filter(t=>!this.historialFecha||t.fecha===this.historialFecha)
         .filter(t=>this.historialResultado==='TODOS'||t.resultado===this.historialResultado);
       this.historial = [...tareasLegacy(historial),...historialNativo].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.hora.localeCompare(a.hora));
+      if(this.vista==='detalle'){const code=this.route.snapshot.paramMap.get('codigo');this.seleccionada=[...this.tareasDia,...this.proximas,...this.historial].find(t=>!t.esExpediente&&t.codigo===code)??null;}
       this.cdr.markForCheck();
       setTimeout(() => this.actualizarMapa());
     } catch { this.error = 'No se pudieron cargar tus fiscalizaciones.'; }
@@ -155,8 +161,8 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
     );
   }
 
-  abrirDetalle(tarea: FiscalizadorTarea): void { this.seleccionada = tarea; this.resultado = tarea.resultado; this.observaciones = tarea.observaciones || ''; this.reporte = null; this.error = ''; this.cdr.markForCheck(); }
-  cerrarDetalle(): void { this.seleccionada = null; this.error = ''; }
+  abrirDetalle(tarea: FiscalizadorTarea): void { if(this.vista!=='detalle'){this.abrirVisita(tarea);return;}this.seleccionada = tarea; this.resultado = tarea.resultado; this.observaciones = tarea.observaciones || ''; this.reporte = null; this.error = ''; this.cdr.markForCheck(); }
+  cerrarDetalle(): void { this.seleccionada = null; this.error = '';void this.router.navigate(['/fiscalizador']); }
 
   onReporteSeleccionado(event: Event): void {
     const file = (event.target as HTMLInputElement).files?.[0] || null;
@@ -205,12 +211,12 @@ export class FiscalizadorComponent implements OnInit, AfterViewInit, OnDestroy {
   private actualizarMapa(): void {
     if (!this.routeMap?.nativeElement) return;
     const centro = this.ubicacionActual || (this.puntosMapa.length ? [this.puntosMapa[0].latitud, this.puntosMapa[0].longitud] as Coordenadas : null);
-    if (!centro) return;
-    if (!this.mapa) { this.mapa = L.map(this.routeMap.nativeElement).setView(centro, 14); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(this.mapa); }
+    const initialCenter:Coordenadas=centro??[-15.3977773,-70.1217652];
+    if (!this.mapa) { this.mapa = L.map(this.routeMap.nativeElement).setView(initialCenter, 14); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(this.mapa); }
     this.mapa.eachLayer(layer => { if (layer instanceof L.Marker) this.mapa?.removeLayer(layer); });
     const markers: L.LatLngExpression[] = [];
     if (this.ubicacionActual) { L.marker(this.ubicacionActual, { icon: L.divIcon({ className: 'route-marker current-marker', html: '<span>0</span>', iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(this.mapa).bindPopup('Ubicación actual'); markers.push(this.ubicacionActual); }
-    this.puntosMapa.forEach((tarea, index) => { const point: L.LatLngExpression = [tarea.latitud, tarea.longitud]; const popup=document.createElement('div');const summary=document.createElement('strong');summary.textContent=`${tarea.ciudadano} · ${tarea.codigo}`;const detail=document.createElement('p');detail.textContent=`${tarea.direccion||'Sin dirección'} · ${tarea.fecha} ${tarea.hora.slice(0,5)}`;popup.append(summary,detail);if(tarea.telefono){const phone=document.createElement('p');phone.textContent=`Teléfono: ${tarea.telefono}`;popup.append(phone);}const link=document.createElement('a');link.href=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${tarea.latitud},${tarea.longitud}`)}`;link.target='_blank';link.rel='noopener';link.textContent='Navegar con Google Maps';popup.append(link);const html=`<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44" aria-hidden="true"><path fill="#dc2626" stroke="#fff" stroke-width="2" d="M18 2C9.2 2 2 9.2 2 18c0 10.4 16 24 16 24s16-13.6 16-24C34 9.2 26.8 2 18 2Z"/><circle cx="18" cy="18" r="8" fill="#fff"/><text x="18" y="22" text-anchor="middle" fill="#dc2626" font-size="11" font-family="Arial" font-weight="700">${index+1}</text></svg>`;L.marker(point,{icon:L.divIcon({className:'route-marker red-pin',html,iconSize:[36,44],iconAnchor:[18,43],popupAnchor:[0,-39]})}).addTo(this.mapa!).bindPopup(popup);markers.push(point); });
+    this.puntosMapa.forEach((tarea, index) => { const point: L.LatLngExpression = [tarea.latitud, tarea.longitud]; const popup=document.createElement('div');const summary=document.createElement('strong');summary.textContent=`${tarea.ciudadano} · ${tarea.codigo}`;const detail=document.createElement('p');detail.textContent=`${tarea.direccion||'Sin dirección'} · ${tarea.fecha} ${tarea.hora.slice(0,5)}`;popup.append(summary,detail);if(tarea.telefono){const phone=document.createElement('p');phone.textContent=`Teléfono: ${tarea.telefono}`;popup.append(phone);}const link=document.createElement('a');link.href=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${tarea.latitud},${tarea.longitud}`)}`;link.target='_blank';link.rel='noopener';link.textContent='Navegar con Google Maps';popup.append(link);const access=document.createElement('button');access.type='button';access.textContent='Consultar visita';access.addEventListener('click',()=>this.abrirVisita(tarea));popup.append(access);const number=this.numeroVisita(tarea);const color=this.colorVisita(tarea);const html=visitPin(number,color);L.marker(point,{icon:L.divIcon({className:'route-marker visit-pin',html,iconSize:[36,44],iconAnchor:[18,43],popupAnchor:[0,-39]})}).addTo(this.mapa!).bindPopup(popup);markers.push(point); });
     if (markers.length > 1) this.mapa.fitBounds(L.latLngBounds(markers), { padding: [20, 20], maxZoom: 16 });
     else if(markers.length===1)this.mapa.setView(markers[0],15);
     this.mapa.invalidateSize({ pan: false });

@@ -42,8 +42,8 @@ public class AltaFiscalizacionService {
     public ExpedienteResponse crear(CrearFiscalizacionRequest request,List<MultipartFile> files,String username){
         storage.validateDocumentBatch(files);
         if(request.expediente().origen()==OrigenFiscalizacion.SOLICITUD&&
-                (blank(request.dependenciaProcedencia())==null||blank(request.referenciaSolicitud())==null))
-            throw new ConflictException("Indique la dependencia y la referencia de la solicitud recibida.");
+                blank(request.referenciaSolicitud())==null)
+            throw new ConflictException("Indique el número o referencia de la solicitud recibida.");
         if(blank(request.dependenciaProcedencia())!=null&&blank(request.referenciaSolicitud())!=null&&
                 expedienteRepository.existsByDependenciaProcedenciaIgnoreCaseAndReferenciaSolicitudIgnoreCase(
                         blank(request.dependenciaProcedencia()),blank(request.referenciaSolicitud())))

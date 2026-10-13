@@ -1,44 +1,33 @@
 import { Routes } from '@angular/router';
 import { LoginComponent } from './pages/login/login';
-import { InicioComponent } from './pages/inicio/inicio';
-import { NuevaCitaComponent } from './pages/nueva-cita/nueva-cita';
-import { PredialComponent } from './pages/predial/predial';
-import { SolicitudesComponent } from './pages/solicitudes/solicitudes';
-import { MapaComponent } from './pages/mapa/mapa';
-import { PerfilComponent } from './pages/perfil/perfil';
-import { FiscalizadorComponent } from './pages/fiscalizador/fiscalizador';
-import { ExpedientesComponent } from './pages/expedientes/expedientes';
-import { ExpedienteNuevoComponent } from './pages/expedientes/expediente-nuevo';
-import { ExpedienteDetalleComponent } from './pages/expedientes/expediente-detalle';
-import { AdminComponent } from './pages/admin/admin';
-import { DiligenciaComponent } from './pages/diligencia/diligencia';
-import { RevisionBandejaComponent, RevisionDetalleComponent } from './pages/expedientes/revision-fiscalizacion';
-import { authGuard, capabilityGuard, adminGuard } from './guards/auth.guard';
+import { authGuard, capabilityGuard, adminGuard, homeGuard } from './guards/auth.guard';
 
 const secured = (capability: string) => ({ canActivate: [authGuard, capabilityGuard], data: { capability } });
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'login', pathMatch: 'full' },
+  { path: '', canActivate:[homeGuard], children:[], pathMatch:'full' },
   { path: 'login', component: LoginComponent },
-  { path: 'inicio', component: InicioComponent, ...secured('SOLICITUD_VER') },
-  { path: 'nueva-solicitud', component: NuevaCitaComponent, ...secured('SOLICITUD_CREAR') },
-  { path: 'nueva-solicitud/:codigo', component: NuevaCitaComponent, ...secured('SOLICITUD_EDITAR') },
+  { path: 'inicio', canActivate:[homeGuard], children:[], pathMatch:'full' },
+  { path: 'nueva-solicitud', loadComponent:()=>import('./pages/nueva-cita/nueva-cita').then(m=>m.NuevaCitaComponent), ...secured('SOLICITUD_CREAR') },
+  { path: 'nueva-solicitud/:codigo', loadComponent:()=>import('./pages/nueva-cita/nueva-cita').then(m=>m.NuevaCitaComponent), ...secured('SOLICITUD_EDITAR') },
   { path: 'nueva-cita', redirectTo: 'nueva-solicitud', pathMatch: 'full' },
   { path: 'nueva-cita/:codigo', redirectTo: 'nueva-solicitud/:codigo', pathMatch: 'full' },
-  { path: 'predial', component: PredialComponent, ...secured('SOLICITUD_CREAR') },
-  { path: 'solicitudes', component: SolicitudesComponent, ...secured('SOLICITUD_VER') },
-  { path: 'expedientes', component: ExpedientesComponent, ...secured('EXPEDIENTE_VER') },
-  { path: 'revisiones', component: RevisionBandejaComponent, ...secured('REVISION_VER') },
-  { path: 'revisiones/:id', component: RevisionDetalleComponent, ...secured('REVISION_VER') },
-  { path: 'expedientes/nuevo', component: ExpedienteNuevoComponent, ...secured('EXPEDIENTE_CREAR') },
-  { path: 'expedientes/:codigo', component: ExpedienteDetalleComponent, ...secured('EXPEDIENTE_VER') },
-  { path: 'mapa', component: MapaComponent, ...secured('SOLICITUD_VER') },
-  { path: 'perfil', component: PerfilComponent, canActivate: [authGuard] },
-  { path: 'fiscalizador', component: FiscalizadorComponent, ...secured('TAREAS_PROPIAS_VER') },
-  { path: 'fiscalizador/ruta', component: FiscalizadorComponent, ...secured('RUTA_VER') },
-  { path: 'fiscalizador/historial', component: FiscalizadorComponent, ...secured('TAREAS_PROPIAS_VER') },
+  { path: 'predial', loadComponent:()=>import('./pages/predial/predial').then(m=>m.PredialComponent), ...secured('SOLICITUD_CREAR') },
+  { path: 'solicitudes', loadComponent:()=>import('./pages/solicitudes/solicitudes').then(m=>m.SolicitudesComponent), ...secured('SOLICITUD_VER') },
+  { path: 'expedientes', loadComponent:()=>import('./pages/expedientes/expedientes').then(m=>m.ExpedientesComponent), ...secured('EXPEDIENTE_VER') },
+  { path: 'revisiones', loadComponent:()=>import('./pages/expedientes/revision-fiscalizacion').then(m=>m.RevisionBandejaComponent), ...secured('REVISION_VER') },
+  { path: 'revisiones/:id', loadComponent:()=>import('./pages/expedientes/revision-fiscalizacion').then(m=>m.RevisionDetalleComponent), ...secured('REVISION_VER') },
+  { path: 'expedientes/nuevo', loadComponent:()=>import('./pages/expedientes/expediente-nuevo').then(m=>m.ExpedienteNuevoComponent), ...secured('EXPEDIENTE_CREAR') },
+  { path: 'expedientes/:codigo', loadComponent:()=>import('./pages/expedientes/expediente-detalle').then(m=>m.ExpedienteDetalleComponent), ...secured('EXPEDIENTE_VER') },
+  { path: 'mapa', loadComponent:()=>import('./pages/mapa/mapa').then(m=>m.MapaComponent), ...secured('SOLICITUD_VER') },
+  { path: 'perfil', loadComponent:()=>import('./pages/perfil/perfil').then(m=>m.PerfilComponent), canActivate: [authGuard] },
+  { path: 'fiscalizador', loadComponent:()=>import('./pages/fiscalizador/fiscalizador').then(m=>m.FiscalizadorComponent), ...secured('TAREAS_PROPIAS_VER') },
+  { path: 'fiscalizador/proximas', loadComponent:()=>import('./pages/fiscalizador/fiscalizador').then(m=>m.FiscalizadorComponent), ...secured('TAREAS_PROPIAS_VER') },
+  { path: 'fiscalizador/visita/:codigo', loadComponent:()=>import('./pages/fiscalizador/fiscalizador').then(m=>m.FiscalizadorComponent), ...secured('TAREAS_PROPIAS_VER') },
+  { path: 'fiscalizador/ruta', loadComponent:()=>import('./pages/fiscalizador/fiscalizador').then(m=>m.FiscalizadorComponent), ...secured('RUTA_VER') },
+  { path: 'fiscalizador/historial', loadComponent:()=>import('./pages/fiscalizador/fiscalizador').then(m=>m.FiscalizadorComponent), ...secured('TAREAS_PROPIAS_VER') },
   { path: 'usuarios', redirectTo: 'admin', pathMatch: 'full' },
-  { path: 'admin', component: AdminComponent, canActivate:[authGuard,adminGuard] },
-  { path: 'fiscalizador/diligencia/:programacionId', component: DiligenciaComponent, ...secured('DILIGENCIA_INICIAR') },
-  { path: '**', redirectTo: 'login' },
+  { path: 'admin', loadComponent:()=>import('./pages/admin/admin').then(m=>m.AdminComponent), canActivate:[authGuard,adminGuard] },
+  { path: 'fiscalizador/diligencia/:programacionId', loadComponent:()=>import('./pages/diligencia/diligencia').then(m=>m.DiligenciaComponent), ...secured('DILIGENCIA_INICIAR') },
+  { path: '**', canActivate:[homeGuard], children:[] },
 ];

@@ -1,0 +1,5 @@
+# Only for the isolated rehearsal. The production file keeps its own binding.
+services:
+  frontend:
+    ports:
+      - "${QA_LAN_IP:?Defina una IP privada del equipo para QA}:${HTTPS_PORT:-18443}:443"

@@ -1,20 +1,27 @@
 <main class="expedientes-page review-page review-inbox">
-  <div class="review-hero">
+  <!-- ENCABEZADO HERO UNIFICADO MUNICIPAL -->
+  <header class="hero-row">
+    <div class="hero-title-card">
+      <p class="eyebrow">MUNICIPALIDAD DISTRITAL DE SAN MIGUEL · REVISIÓN MUNICIPAL</p>
+      <h1>Pendientes de revisión</h1>
+    </div>
+  </header>
+
+  <!-- BOTONES DEBAJO DEL ENCABEZADO -->
+  <div class="review-actions-row">
     <a class="back" routerLink="/expedientes">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m15 18-6-6 6-6"/><path d="M20 12H9"/></svg>
       Volver a Fiscalizaciones
     </a>
-    <header class="review-heading">
-      <div>
-        <p class="eyebrow">MUNICIPALIDAD DISTRITAL DE SAN MIGUEL · REVISIÓN MUNICIPAL</p>
-        <h1>Pendientes de revisión</h1>
-        <p class="review-description">Revisa diligencias finalizadas, actas y evidencias antes de registrar una conclusión.</p>
-      </div>
-      <button type="button" class="review-refresh" (click)="cargar()" [disabled]="cargando">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9a7 7 0 0 1 11.8-2L20 12M4 12l2.6 5a7 7 0 0 0 11.8-2"/></svg>
-        Actualizar
-      </button>
-    </header>
+
+    <button type="button" class="btn-action-light review-refresh" (click)="cargar()" [disabled]="cargando">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="btn-icon">
+        <polyline points="23 4 23 10 17 10"/>
+        <polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      <span>Actualizar</span>
+    </button>
   </div>
 
   <section class="review-filters" aria-label="Filtros de revisión">

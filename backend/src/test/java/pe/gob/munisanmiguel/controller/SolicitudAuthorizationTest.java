@@ -20,6 +20,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(SolicitudController.class)
 @Import(SecurityConfig.class)
 class SolicitudAuthorizationTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean pe.gob.munisanmiguel.service.MunicipalAccessService municipalAccess;
+
     @Autowired MockMvc mvc;
     @MockitoBean SolicitudService service;
     @MockitoBean JwtService jwtService;

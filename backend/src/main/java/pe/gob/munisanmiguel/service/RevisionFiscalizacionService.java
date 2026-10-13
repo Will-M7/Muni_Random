@@ -29,20 +29,22 @@ public class RevisionFiscalizacionService {
     private final FiscalizadorRepository fiscalizadores;
     private final FiscalizacionFileStorageService storage;
     private final ObjectMapper json;
+    private final MunicipalAccessService access;
 
     public RevisionFiscalizacionService(RevisionFiscalizacionRepository revisions,SolicitudAclaracionFiscalizacionRepository aclaraciones,
             DiligenciaFiscalizacionRepository diligencias,ExpedienteFiscalizacionRepository expedientes,AppUserRepository users,
             ExpedienteHistorialRepository historial,ProgramacionFiscalizacionRepository programaciones,EvidenciaFiscalizacionRepository evidencias,
             FiscalizadorRepository fiscalizadores,
-            FiscalizacionFileStorageService storage,ObjectMapper json) {
+            FiscalizacionFileStorageService storage,ObjectMapper json,MunicipalAccessService access) {
         this.revisions=revisions;this.aclaraciones=aclaraciones;this.diligencias=diligencias;this.expedientes=expedientes;this.users=users;
-        this.historial=historial;this.programaciones=programaciones;this.evidencias=evidencias;this.fiscalizadores=fiscalizadores;this.storage=storage;this.json=json;
+        this.historial=historial;this.programaciones=programaciones;this.evidencias=evidencias;this.fiscalizadores=fiscalizadores;this.storage=storage;this.json=json;this.access=access;
     }
 
     @Transactional(readOnly=true)
     public List<Map<String,Object>> pendientes(){
-        var rows=new ArrayList<Map<String,Object>>();
+        var rows=new ArrayList<Map<String,Object>>();var actor=access.current();
         for(var d:diligencias.findAllByEstadoOrderByFechaCierreAsc(EstadoDiligencia.FINALIZADA)){
+            if(!access.canRead(d.getExpediente(),actor))continue;
             var rev=revisions.findByDiligenciaId(d.getId()).orElse(null);
             if(rev!=null&&rev.getEstadoRevision()==EstadoRevision.FINALIZADA)continue;
             var e=d.getExpediente();var p=d.getProgramacion();var m=base(d);
@@ -115,7 +117,7 @@ public class RevisionFiscalizacionService {
         var rev=revision(id);if(rev.getEstadoRevision()!=EstadoRevision.FINALIZADA||!rev.isRequiereSeguimiento()||rev.getExpediente().getEstado()!=EstadoExpediente.EN_SEGUIMIENTO)throw new ConflictException("El expediente no tiene seguimiento pendiente habilitado.");
         if(programaciones.existsByRevisionOrigen_Id(id))throw new ConflictException("Esta revisión ya tiene una programación de seguimiento asociada.");
         if(req.fecha().isBefore(LocalDate.now(LIMA)))throw new ConflictException("El seguimiento debe programarse para hoy o una fecha futura.");
-        var p=new ProgramacionFiscalizacion();p.setExpediente(rev.getExpediente());p.setFiscalizador(fiscalizador(req.fiscalizadorId()));if(!p.getFiscalizador().isActivo())throw new ConflictException("El fiscalizador está inactivo.");p.setFecha(req.fecha());p.setHora(req.hora());if(programaciones.existsByFiscalizadorIdAndFechaAndHoraAndEstadoProgramacionIn(req.fiscalizadorId(),req.fecha(),req.hora(),List.of(EstadoProgramacion.PROGRAMADA,EstadoProgramacion.EN_CURSO)))throw new ConflictException("El fiscalizador ya tiene una visita activa para esa fecha y hora.");p.setTipoVisita(req.tipoVisita());p.setEstadoProgramacion(EstadoProgramacion.PROGRAMADA);p.setFechaCreacion(now());p.setCreadaPor(usuario(username));p.setMotivoSeguimiento(req.motivo().trim());p.setRevisionOrigen(rev);programaciones.saveAndFlush(p);
+        var p=new ProgramacionFiscalizacion();p.setExpediente(rev.getExpediente());p.setFiscalizador(fiscalizador(req.fiscalizadorId()));access.requireAssignment(usuario(username),p.getFiscalizador());if(!p.getFiscalizador().isActivo())throw new ConflictException("El fiscalizador está inactivo.");p.setFecha(req.fecha());p.setHora(req.hora());if(programaciones.existsByFiscalizadorIdAndFechaAndHoraAndEstadoProgramacionIn(req.fiscalizadorId(),req.fecha(),req.hora(),List.of(EstadoProgramacion.PROGRAMADA,EstadoProgramacion.EN_CURSO)))throw new ConflictException("El fiscalizador ya tiene una visita activa para esa fecha y hora.");p.setTipoVisita(req.tipoVisita());p.setEstadoProgramacion(EstadoProgramacion.PROGRAMADA);p.setFechaCreacion(now());p.setCreadaPor(usuario(username));p.setMotivoSeguimiento(req.motivo().trim());p.setRevisionOrigen(rev);programaciones.saveAndFlush(p);
         var h=evento(rev,"PROGRAMACION_SEGUIMIENTO_CREADA","Programación de seguimiento creada: "+req.motivo().trim(),username);h.setProgramacion(p);
         return Map.of("id",p.getId(),"expedienteCodigo",rev.getExpediente().getCodigo(),"fecha",p.getFecha(),"hora",p.getHora(),"tipoVisita",p.getTipoVisita().name(),"fiscalizador",p.getFiscalizador().getNombre(),"motivo",p.getMotivoSeguimiento());
     }

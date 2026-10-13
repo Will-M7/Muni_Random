@@ -9,11 +9,11 @@ import { AuthService, Sesion } from '../../services/auth.service';
 describe('LoginComponent', () => {
   let component: LoginComponent;
   let fixture: ComponentFixture<LoginComponent>;
-  let authService: { isAuthenticated: ReturnType<typeof vi.fn>; login: ReturnType<typeof vi.fn>; logout: ReturnType<typeof vi.fn> };
+  let authService: { isAuthenticated: ReturnType<typeof vi.fn>; login: ReturnType<typeof vi.fn>; logout: ReturnType<typeof vi.fn>;homeRoute:ReturnType<typeof vi.fn> };
   let router: Router;
   const session = (rol: 'ADMIN_SISTEMA' | 'FISCALIZADOR' | 'MUNICIPIO'): Sesion => ({
     token: 'token', nombre: 'Usuario', cargo: 'Cargo', correo: 'usuario@muni.gob.pe', rol,
-    capacidades: rol === 'ADMIN_SISTEMA' ? ['ROLES_VER'] : rol === 'FISCALIZADOR' ? ['TAREAS_PROPIAS_VER'] : ['SOLICITUD_VER'],
+    capacidades: rol === 'ADMIN_SISTEMA' ? ['ROLES_VER'] : rol === 'FISCALIZADOR' ? ['TAREAS_PROPIAS_VER'] : ['EXPEDIENTE_VER','SOLICITUD_VER'],
   });
 
   beforeEach(async () => {
@@ -21,6 +21,7 @@ describe('LoginComponent', () => {
       isAuthenticated: vi.fn().mockReturnValue(false),
       login: vi.fn(),
       logout: vi.fn(),
+      homeRoute:vi.fn().mockImplementation(s=>AuthService.prototype.homeRoute.call({} as AuthService,s)),
     };
     await TestBed.configureTestingModule({
       imports: [LoginComponent],
@@ -33,7 +34,7 @@ describe('LoginComponent', () => {
     component.ngOnInit();
   });
 
-  it('redirige a /perfil con la respuesta FISCALIZADOR', async () => {
+  it('redirige a /fiscalizador con la respuesta FISCALIZADOR', async () => {
     authService.login.mockResolvedValue(session('FISCALIZADOR'));
     component.usuario = 'fiscalizador';
     component.password = 'fiscal2026';
@@ -43,13 +44,13 @@ describe('LoginComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/fiscalizador']);
   });
 
-  it('redirige a /inicio con la respuesta MUNICIPIO', async () => {
+  it('redirige a /expedientes con la respuesta MUNICIPIO', async () => {
     authService.login.mockResolvedValue(session('MUNICIPIO'));
     component.usuario = 'municipio';
     component.password = 'municipio2026';
     component.iniciarSesion();
     await fixture.whenStable();
-    expect(router.navigate).toHaveBeenCalledWith(['/inicio']);
+    expect(router.navigate).toHaveBeenCalledWith(['/expedientes']);
   });
 
   it('redirige a /admin con capacidades de administración', async () => {

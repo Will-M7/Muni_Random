@@ -16,6 +16,9 @@ public class RoleCapabilityService {
     @Transactional public RoleResponse setCapabilities(String roleName, RoleCapabilitiesRequest request) {
         var role=roles.findByName(roleName).orElseThrow();
         if (!role.isConfigurable()) throw new IllegalArgumentException("Este rol no es configurable.");
+        if ("ADMIN_SISTEMA".equals(role.getName()) && !request.capacidades().containsAll(java.util.Set.of(
+                "ROLES_VER", "ROLES_GESTIONAR", "CAPACIDADES_GESTIONAR")))
+            throw new IllegalArgumentException("ADMIN_SISTEMA debe conservar la gestión de roles y capacidades para evitar bloquear la administración del sistema.");
         var found=capabilities.findAll().stream().filter(c->request.capacidades().contains(c.getCode())).toList();
         if (found.size()!=new java.util.HashSet<>(request.capacidades()).size()) throw new IllegalArgumentException("La lista contiene capacidades desconocidas.");
         role.getCapabilities().clear(); role.getCapabilities().addAll(found);

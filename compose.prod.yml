@@ -5,15 +5,18 @@ services:
     environment:
       MYSQL_DATABASE: ${DB_NAME:?Defina DB_NAME}
       MYSQL_USER: ${DB_USER:?Defina DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD}
-    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+      MYSQL_PASSWORD_FILE: /run/secrets/db_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+    secrets:
+      - db_password
+      - mysql_root_password
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--require-secure-transport=ON"]
     volumes:
       - mysql_prod_data:/var/lib/mysql
     networks:
       - private
     healthcheck:
-      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u \"$$MYSQL_USER\" --password=\"$$MYSQL_PASSWORD\" -D \"$$MYSQL_DATABASE\" -Nse 'SELECT 1' >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "MYSQL_PWD=$$(cat /run/secrets/db_password) mysql -h 127.0.0.1 -u \"$$MYSQL_USER\" -D \"$$MYSQL_DATABASE\" -Nse 'SELECT 1' >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 18
@@ -29,22 +32,30 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      TZ: America/Lima
+      JAVA_TOOL_OPTIONS: -Duser.timezone=America/Lima
       SPRING_FLYWAY_BASELINE_ON_MIGRATE: "false"
       SPRING_FLYWAY_LOCATIONS: classpath:db/migration,classpath:db/production
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
       MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
       MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE: readinessState,db
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_NAME: ${DB_NAME:?Defina DB_NAME}
       DB_USER: ${DB_USER:?Defina DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET}
-      IDENTITY_MASTER_KEY: ${IDENTITY_MASTER_KEY:?Defina IDENTITY_MASTER_KEY}
       ADMIN_BOOTSTRAP_USERNAME: ${ADMIN_BOOTSTRAP_USERNAME:?Defina ADMIN_BOOTSTRAP_USERNAME}
-      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:?Defina ADMIN_BOOTSTRAP_PASSWORD}
       CORS_ORIGINS: ${CORS_ORIGINS:?Defina CORS_ORIGINS}
       APP_STORAGE_PATH: /app/uploads/solicitudes
       APP_DILIGENCIAS_PATH: /app/uploads/diligencias
+    secrets:
+      - source: db_password
+        target: spring.datasource.password
+      - source: jwt_secret
+        target: app.jwt.secret
+      - source: identity_master_key
+        target: app.identity.master-key
+      - source: admin_password
+        target: app.bootstrap-admin.password
     volumes:
       - uploads_prod_data:/app/uploads
     networks:
@@ -67,7 +78,13 @@ services:
         condition: service_healthy
     ports:
       - "${APP_BIND_IP:-127.0.0.1}:${HTTPS_PORT:-8443}:443"
+      - "${APP_BIND_IP:-127.0.0.1}:${HTTP_PORT:-8088}:80"
+    environment:
+      SERVER_NAME: ${SERVER_NAME:?Defina el nombre DNS interno definitivo}
+      HTTPS_PORT: ${HTTPS_PORT:-8443}
+      NGINX_ENVSUBST_FILTER: '^(SERVER_NAME|HTTPS_PORT)$$'
     volumes:
+      - ./docker/nginx.prod.conf.template:/etc/nginx/templates/default.conf.template:ro
       - type: bind
         source: ${TLS_CERT_PATH:?Defina TLS_CERT_PATH}
         target: /etc/nginx/tls/tls.crt
@@ -89,3 +106,15 @@ networks:
 volumes:
   mysql_prod_data:
   uploads_prod_data:
+
+secrets:
+  db_password:
+    file: ${DB_PASSWORD_FILE:?Defina DB_PASSWORD_FILE fuera de Git}
+  mysql_root_password:
+    file: ${MYSQL_ROOT_PASSWORD_FILE:?Defina MYSQL_ROOT_PASSWORD_FILE fuera de Git}
+  jwt_secret:
+    file: ${JWT_SECRET_FILE:?Defina JWT_SECRET_FILE fuera de Git}
+  identity_master_key:
+    file: ${IDENTITY_MASTER_KEY_FILE:?Defina IDENTITY_MASTER_KEY_FILE fuera de Git}
+  admin_password:
+    file: ${ADMIN_BOOTSTRAP_PASSWORD_FILE:?Defina ADMIN_BOOTSTRAP_PASSWORD_FILE fuera de Git}

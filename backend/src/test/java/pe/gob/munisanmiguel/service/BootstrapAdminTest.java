@@ -11,6 +11,20 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class BootstrapAdminTest {
+    @Test void productionDoesNotCreateAnotherAdminWhenBootstrapUsernameChanges(){
+        var users=mock(AppUserRepository.class); when(users.count()).thenReturn(1L);
+        var bootstrap=new BootstrapAdmin(users,mock(AppRoleRepository.class),mock(PasswordEncoder.class),mock(AdminSettingsService.class),"different-admin","long-new-password");
+        org.springframework.test.util.ReflectionTestUtils.setField(bootstrap,"onlyEmptyDatabase",true);
+        bootstrap.run(mock(ApplicationArguments.class));
+        verify(users,never()).saveAndFlush(any());
+    }
+    @Test void existingAccountPasswordIsNeverReset(){
+        var users=mock(AppUserRepository.class);
+        when(users.findByUsernameIgnoreCase("bootstrap")).thenReturn(Optional.of(new AppUser()));
+        var encoder=mock(PasswordEncoder.class);
+        new BootstrapAdmin(users,mock(AppRoleRepository.class),encoder,mock(AdminSettingsService.class),"bootstrap","new-password").run(null);
+        verify(users,never()).saveAndFlush(any()); verifyNoInteractions(encoder);
+    }
     @Test void aceptaOchoCaracteresYGuardaPreferencias(){
         var users=mock(AppUserRepository.class);var roles=mock(AppRoleRepository.class);var settings=mock(AdminSettingsService.class);
         var role=new AppRole();role.setName("ADMIN_SISTEMA");when(roles.findByName("ADMIN_SISTEMA")).thenReturn(Optional.of(role));

@@ -36,4 +36,10 @@ describe('recorrido del fiscalizador',()=>{
     await x.iniciarDesdeAgenda(task);
     expect(start).toHaveBeenCalledWith(8,{estadoGps:'NO_DISPONIBLE'});expect(navigate).toHaveBeenCalledWith(['/fiscalizador/diligencia',8]);
   });
+  it('mantiene los números del recorrido y colores de mapa aun con visitas sin coordenadas',()=>{
+    const x=portal();const first=tarea('A','08:00',-15.3,-70.2),second=tarea('B','10:00',-15.4,-70.1),missing=tarea('C','09:00',null,null);
+    x.tareasDia=[second,missing,first];expect(x.numeroVisita(first)).toBe(1);expect(x.numeroVisita(second)).toBe(2);expect(x.colorVisita(second)).toBe('#15803d');expect(x.numeroVisita(missing)).toBe(3);
+    x.proximas=[second];expect(x.puntosMapa.length).toBe(2);x.ubicacionActual=[-15.4,-70.1];expect(x.numeroVisita(second)).toBe(1);expect(x.colorVisita(second)).toBe('#2563eb');
+  });
+
 });

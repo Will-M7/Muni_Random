@@ -647,3 +647,117 @@
     align-items: flex-start;
   }
 }
+
+/* Solo /revisiones: fondo continuo, sin las capas de desvanecimiento del hero. */
+:host(app-revision-bandeja),
+.review-page.review-inbox {
+  background: linear-gradient(rgba(255,255,255,.25),rgba(255,255,255,.25)),
+    url('/assets/imagenes/municipalidad-san-miguel.png') top center/cover no-repeat fixed;
+}
+.review-inbox .review-hero { background: transparent; }
+
+/* ========================================================
+   ENCABEZADO HERO UNIFICADO MUNICIPAL (/revisiones)
+   ======================================================== */
+.review-inbox .hero-row {
+  position: relative;
+  isolation: isolate;
+  min-height: 142px;
+  margin: 0 0 16px;
+  padding: 28px 30px;
+  border: 1px solid #d9e9dd;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #dfeee7;
+  box-shadow: 0 8px 24px #1b51300b;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.review-inbox .hero-row h1 {
+  font-size: clamp(2.2rem, 3.5vw, 3.2rem);
+  letter-spacing: -0.035em;
+  color: #083e30;
+  margin: 6px 0 0;
+  line-height: 1.1;
+  font-weight: 850;
+}
+
+.review-inbox .eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  font-size: 0.69rem;
+  font-weight: 800;
+  color: #a97722;
+}
+
+.review-inbox .hero-row > div:first-child,
+.review-inbox .hero-title-card {
+  background: rgba(255, 255, 255, .92);
+  border-radius: 8px;
+  box-shadow: 0 0 0 10px rgba(255, 255, 255, .92);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.review-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.review-actions-row .back,
+.review-actions-row .btn-action-light {
+  background: #ffffff;
+  border: 1.5px solid #d1d9d3;
+  border-radius: 8px;
+  padding: 9px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #173620;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  transition: all 0.15s;
+}
+
+.review-actions-row .back:hover,
+.review-actions-row .btn-action-light:hover:not(:disabled) {
+  background: #f7faf8;
+  border-color: #076b25;
+  color: #076b25;
+}
+
+.review-actions-row .back svg,
+.review-actions-row .btn-action-light svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+@media (max-width: 720px) {
+  .review-inbox .hero-row {
+    min-height: 0;
+    margin-top: 12px;
+    padding: 24px 18px;
+    align-items: stretch;
+  }
+  .review-inbox .hero-row h1 {
+    font-size: 2.1rem;
+  }
+  .review-actions-row {
+    justify-content: flex-start;
+  }
+}
+
+.review-inbox .hero-row .eyebrow {
+  color: #805b1a;
+}

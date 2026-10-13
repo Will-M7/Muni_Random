@@ -13,6 +13,8 @@ import java.util.List;
 
 public interface ProgramacionFiscalizacionRepository extends JpaRepository<ProgramacionFiscalizacion,Long> {
     List<ProgramacionFiscalizacion> findAllByOrderByFechaAscHoraAsc();
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths={"expediente","expediente.creadoPor","fiscalizador","fiscalizador.municipioResponsable"})
+    List<ProgramacionFiscalizacion> findAllByFechaGreaterThanEqualAndFechaLessThanOrderByFechaAscHoraAscIdAsc(LocalDate desde,LocalDate hasta);
     List<ProgramacionFiscalizacion> findAllByFechaOrderByHoraAscIdAsc(LocalDate fecha);
     List<ProgramacionFiscalizacion> findAllByExpedienteIdOrderByIdAsc(Long expedienteId);
     List<ProgramacionFiscalizacion> findAllByFiscalizadorIdAndEstadoProgramacionInOrderByFechaAscHoraAsc(String fiscalizadorId,List<EstadoProgramacion> estados);

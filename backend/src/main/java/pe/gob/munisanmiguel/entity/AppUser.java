@@ -22,4 +22,11 @@ public class AppUser {
     @Column(name = "created_at", nullable = false, updatable = false) private java.time.LocalDateTime createdAt;
     @Column(name = "archived_at") private java.time.LocalDateTime archivedAt;
     @Column(name = "archived_by", length = 120) private String archivedBy;
+    /** Authorization uses assigned roles, never the legacy single-role column. */
+    public boolean hasCompatibleIdentity() {
+        boolean operational=roles.stream().anyMatch(r -> "FISCALIZADOR".equals(r.getName()));
+        return archivedAt == null && (operational
+                ? fiscalizador != null && fiscalizador.isActivo()
+                : fiscalizador == null);
+    }
 }

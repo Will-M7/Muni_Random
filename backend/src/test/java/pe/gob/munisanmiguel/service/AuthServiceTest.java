@@ -37,14 +37,15 @@ class AuthServiceTest {
     private pe.gob.munisanmiguel.dto.ApiDtos.LoginResponse assertLogin(String roleName, Rol legacyRole, String rawPassword, String hash, String... codes) {
         var role=new AppRole(); role.setName(roleName);
         for (String code : codes) { var capability=new Capability(); capability.setCode(code); role.getCapabilities().add(capability); }
-        var user=new AppUser(); user.setUsername("user"); user.setPasswordHash(hash); user.setRole(legacyRole); user.setRoles(Set.of(role)); user.setDisplayName("Usuario"); user.setCargo(roleName);
+        var user=new AppUser(); user.setUsername("user"); user.setPasswordHash(hash); user.setRole(legacyRole); user.setRoles(Set.of(role));
+        if (roleName.equals("FISCALIZADOR")) { var f=new pe.gob.munisanmiguel.entity.Fiscalizador();f.setId("F-TEST");f.setActivo(true);user.setFiscalizador(f); } user.setDisplayName("Usuario"); user.setCargo(roleName);
         when(users.findByUsernameIgnoreCaseAndActivoTrue("user")).thenReturn(java.util.Optional.of(user));
         when(jwt.create(anyString(), anyString())).thenReturn("signed-token");
         var response=service.login(new LoginRequest("user", null, rawPassword, null));
         assertEquals(roleName, response.rol());
         assertEquals(java.util.List.of(roleName), response.roles());
         assertEquals(java.util.Arrays.stream(codes).sorted().toList(), response.capacidades());
-        verify(jwt).create("user", "");
+        verify(jwt).create("user", roleName.equals("FISCALIZADOR") ? "F-TEST" : "");
         return response;
     }
 }

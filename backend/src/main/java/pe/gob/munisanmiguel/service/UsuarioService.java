@@ -54,7 +54,11 @@ public class UsuarioService {
                 .map(f->new FiscalizadorDisponibleResponse(f.getId(),f.getNombre(),f.getZona(),true)).toList();
     }
     @Transactional(readOnly = true) public java.util.List<FiscalizadorDisponibleResponse> fiscalizadoresDisponibles() {
+        var auth=SecurityContextHolder.getContext().getAuthentication();
+        var actor=auth==null?null:users.findByUsernameIgnoreCaseAndActivoTrue(auth.getName()).orElse(null);
+        boolean municipal=actor!=null&&actor.getRoles().stream().anyMatch(r->"MUNICIPIO".equals(r.getName()));
         return users.findAllByOrderByUsernameAsc().stream()
+                .filter(u -> !municipal||(u.getFiscalizador()!=null&&u.getFiscalizador().getMunicipioResponsable()!=null&&actor.getId().equals(u.getFiscalizador().getMunicipioResponsable().getId())))
                 .filter(u -> u.isActivo() && u.getRoles().stream().anyMatch(r -> r.getName().equals("FISCALIZADOR")) && u.getFiscalizador() != null && u.getFiscalizador().isActivo())
                 .map(u -> { var f=u.getFiscalizador(); return new FiscalizadorDisponibleResponse(f.getId(), f.getNombre(), f.getZona(), f.isActivo()); })
                 .toList();
@@ -76,9 +80,13 @@ public class UsuarioService {
             if(request.password().length()<8)throw new IllegalArgumentException("La contraseña debe tener al menos 8 caracteres.");
             u.setPasswordHash(encoder.encode(request.password()));
         }
-        Rol current=admin?Rol.ADMIN_SISTEMA:u.getRoles().stream().map(AppRole::getName).filter(n->n.equals("MUNICIPIO")||n.equals("FISCALIZADOR")).findFirst().map(Rol::valueOf).orElse(u.getRole());
-        if(current==Rol.MUNICIPIO&&request.rol()==Rol.FISCALIZADOR)vincularFiscalizador(u,null);
-        if(current==Rol.FISCALIZADOR&&request.rol()==Rol.MUNICIPIO)u.setFiscalizador(null); // Keep the operational record and its historical assignments.
+        if(request.rol()!=Rol.MUNICIPIO && u.getRoles().stream().anyMatch(r->"MUNICIPIO".equals(r.getName())) && fiscalizadores.existsByMunicipioResponsableId(u.getId()))
+            throw new ConflictException("Reasigna primero los fiscalizadores gestionados por esta cuenta municipal antes de retirar su rol.");
+        if(request.rol()==Rol.FISCALIZADOR) {
+            exigirDecisionIdentidadHeredada(u,null);
+            vincularFiscalizador(u,null);
+        }
+        if(request.rol()!=Rol.FISCALIZADOR)u.setFiscalizador(null); // Keep the operational record and its historical assignments.
         u.getRoles().clear();u.getRoles().add(roles.findByName(request.rol().name()).orElseThrow());u.setRole(request.rol());u.setDisplayName(nombre);u.setUsername(username);
         u.setCargo(switch(request.rol()){case MUNICIPIO->"Gestión municipal";case FISCALIZADOR->"Fiscalizador Técnico de Campo";case ADMIN_SISTEMA->"Administración del sistema";});
         return toResponse(u);
@@ -114,12 +122,23 @@ public class UsuarioService {
         if(u.isActivo()&&u.getRoles().stream().anyMatch(r->"ADMIN_SISTEMA".equals(r.getName()))&&!roleNames.contains("ADMIN_SISTEMA")&&
                 users.activeAdminsForUpdate().stream().noneMatch(other->!other.getId().equals(u.getId())))
             throw new ConflictException("No se puede retirar el rol del último administrador activo.");
+        if(!roleNames.contains("MUNICIPIO") && u.getRoles().stream().anyMatch(r->"MUNICIPIO".equals(r.getName())) && fiscalizadores.existsByMunicipioResponsableId(u.getId()))
+            throw new ConflictException("Reasigna primero los fiscalizadores gestionados por esta cuenta municipal antes de retirar su rol.");
         var found=roles.findAll().stream().filter(r -> roleNames.contains(r.getName())).toList();
         if (found.size()!=new java.util.HashSet<>(roleNames).size() || found.isEmpty()) throw new IllegalArgumentException("Selecciona al menos un rol válido.");
+        if(found.stream().anyMatch(r->"FISCALIZADOR".equals(r.getName()))) exigirDecisionIdentidadHeredada(u,fiscalizadorId);
         u.getRoles().clear(); u.getRoles().addAll(found); u.setRole(pe.gob.munisanmiguel.entity.Rol.valueOf(found.get(0).getName()));
         if(found.stream().anyMatch(r->"FISCALIZADOR".equals(r.getName())))vincularFiscalizador(u,fiscalizadorId);
-        else if(fiscalizadorId!=null&&!fiscalizadorId.isBlank())throw new ConflictException("El usuario necesita el rol FISCALIZADOR para vincularse.");
+        else {
+            if(fiscalizadorId!=null&&!fiscalizadorId.isBlank())throw new ConflictException("El usuario necesita el rol FISCALIZADOR para vincularse.");
+            u.setFiscalizador(null); // Assignments and actor references stay on their original records.
+        }
         return toResponse(u);
+    }
+    private void exigirDecisionIdentidadHeredada(AppUser user,String requestedId) {
+        if(user.getFiscalizador()==null && user.getRoles().stream().anyMatch(r->"FISCALIZADOR".equals(r.getName()))
+                && (requestedId==null || requestedId.isBlank()))
+            throw new ConflictException("La cuenta fiscalizadora heredada no tiene identidad operativa. Confirma y selecciona una identidad explícita al asignar sus roles.");
     }
     private void vincularFiscalizador(AppUser user,String requestedId){
         if(user.getFiscalizador()!=null){
@@ -129,7 +148,7 @@ public class UsuarioService {
         }
         if(user.getId()==null)users.saveAndFlush(user);
         if(requestedId!=null&&!requestedId.isBlank()){
-            var selected=fiscalizadores.findById(requestedId).orElseThrow(()->new ConflictException("Fiscalizador operativo no encontrado."));
+            var selected=fiscalizadores.findForIdentityLink(requestedId).orElseThrow(()->new ConflictException("Fiscalizador operativo no encontrado."));
             if(!selected.isActivo()||users.existsByFiscalizadorId(selected.getId()))
                 throw new ConflictException("El fiscalizador operativo está inactivo o ya tiene una cuenta.");
             user.setFiscalizador(selected);return;

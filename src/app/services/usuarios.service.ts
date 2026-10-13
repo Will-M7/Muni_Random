@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export type RolUsuario = 'ADMIN_SISTEMA' | 'MUNICIPIO' | 'FISCALIZADOR';
+export interface FiscalizadorGestion { id:string;nombre:string;municipioUsername:string|null;municipioNombre:string|null; }
 export interface Usuario { username: string; nombre: string; rol: RolUsuario; roles: RolUsuario[]; activo: boolean; archivado:boolean; fechaCreacion: string; fiscalizadorId:string|null; fiscalizadorNombre:string|null; }
 export interface UsuarioEliminacion { username:string; accion:'ELIMINADA'|'ARCHIVADA'|'ERROR'; referencias:string[]; mensaje:string; }
 export interface UsuarioEliminacionPreview { username:string; nombre:string; puedeEliminar:boolean; referencias:string[]; }
@@ -13,13 +14,14 @@ export interface IdentityConfiguration { provider:'DISABLED'|'RENIEC'|'PERUAPI_C
 export interface IdentityDniTestResult { dni:string; nombres:string; apellidoPaterno:string; apellidoMaterno:string; provider:'RENIEC'|'PERUAPI_COM'|'FACTILIZA'; message:string; }
 export interface IdentityDniQuota { applies:boolean; provider:string; date:string; used:number; limit:number; remaining:number; exhausted:boolean; resetsAt:string; zone:string; }
 export interface FiscalizadorSinCuenta { id:string; nombre:string; zona:string; activo:boolean; }
-export interface RolSistema { nombre: RolUsuario; descripcion: string; configurable: boolean; capacidades: string[]; }
-export interface Capacidad { codigo: string; descripcion: string; categoria: string; }
 
 @Injectable({ providedIn: 'root' })
 export class UsuariosService {
   private readonly url = `${environment.apiUrl}/api/usuarios`;
   constructor(private http: HttpClient) {}
+  municipalesGestion():Promise<Usuario[]>{return firstValueFrom(this.http.get<Usuario[]>(this.url,{params:{filtro:'todos'}})).then(users=>users.filter(u=>u.activo&&!u.archivado&&(u.roles??[u.rol]).includes('MUNICIPIO')));}
+  gestionFiscalizadores():Promise<FiscalizadorGestion[]>{return firstValueFrom(this.http.get<FiscalizadorGestion[]>(`${environment.apiUrl}/api/admin/fiscalizadores-gestion`));}
+  asignarResponsableMunicipal(id:string,municipioUsername:string|null):Promise<FiscalizadorGestion>{return firstValueFrom(this.http.put<FiscalizadorGestion>(`${environment.apiUrl}/api/admin/fiscalizadores-gestion/${encodeURIComponent(id)}`,{municipioUsername}));}
   listar(filtro='activos'): Promise<Usuario[]> { return firstValueFrom(this.http.get<Usuario[]>(this.url,{params:{filtro}})); }
   crear(data: UsuarioNuevo): Promise<Usuario> { return firstValueFrom(this.http.post<Usuario>(this.url, data)); }
   cambiarEstado(username: string, activo: boolean): Promise<Usuario> { return firstValueFrom(this.http.patch<Usuario>(`${this.url}/${encodeURIComponent(username)}/estado`, { activo })); }
@@ -30,9 +32,6 @@ export class UsuariosService {
   archivar(username:string,archivado:boolean):Promise<Usuario>{return firstValueFrom(this.http.patch<Usuario>(`${this.url}/${encodeURIComponent(username)}/archivo`,{archivado}));}
   asignarRoles(username: string, roles: RolUsuario[],fiscalizadorId?:string): Promise<Usuario> { return firstValueFrom(this.http.put<Usuario>(`${this.url}/${encodeURIComponent(username)}/roles`, { roles,fiscalizadorId:fiscalizadorId||null })); }
   fiscalizadoresSinCuenta():Promise<FiscalizadorSinCuenta[]>{return firstValueFrom(this.http.get<FiscalizadorSinCuenta[]>(`${this.url}/fiscalizadores-sin-cuenta`));}
-  listarRoles(): Promise<RolSistema[]> { return firstValueFrom(this.http.get<RolSistema[]>(`${environment.apiUrl}/api/admin/roles`)); }
-  listarCapacidades(): Promise<Capacidad[]> { return firstValueFrom(this.http.get<Capacidad[]>(`${environment.apiUrl}/api/admin/capacidades`)); }
-  guardarCapacidades(nombre: string, capacidades: string[]): Promise<RolSistema> { return firstValueFrom(this.http.put<RolSistema>(`${environment.apiUrl}/api/admin/roles/${encodeURIComponent(nombre)}/capacidades`, { capacidades })); }
   preferencias(username:string):Promise<UserPreferences>{return firstValueFrom(this.http.get<UserPreferences>(`${environment.apiUrl}/api/settings/users/${encodeURIComponent(username)}`));}
   guardarPreferencias(username:string,value:UserPreferences):Promise<UserPreferences>{return firstValueFrom(this.http.put<UserPreferences>(`${environment.apiUrl}/api/settings/users/${encodeURIComponent(username)}`,value));}
   misPreferencias():Promise<UserPreferences>{return firstValueFrom(this.http.get<UserPreferences>(`${environment.apiUrl}/api/settings/me`));}

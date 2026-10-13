@@ -1,0 +1,8 @@
+import {TestBed} from '@angular/core/testing';
+import {describe,it,expect,vi} from 'vitest';
+import {AgendaCalendarComponent} from './agenda-calendar';
+describe('calendario mensual accesible',()=>{
+  it('muestra febrero bisiesto, blanco sin visitas y colores reales',async()=>{await TestBed.configureTestingModule({imports:[AgendaCalendarComponent]}).compileComponents();const f=TestBed.createComponent(AgendaCalendarComponent);const c=f.componentInstance;c.month='2028-02';c.limit=5;c.counts={'2028-02-04':4,'2028-02-05':6};f.detectChanges();expect(f.nativeElement.querySelectorAll('button[data-date]').length).toBe(29);expect(f.nativeElement.querySelector('[data-date="2028-02-01"]').classList.contains('neutral')).toBe(true);expect(f.nativeElement.querySelector('[data-date="2028-02-04"]').classList.contains('yellow')).toBe(true);expect(f.nativeElement.querySelector('[data-date="2028-02-05"]').classList.contains('red')).toBe(true);});
+  it('selecciona fecha y navega entre meses y años con teclado',()=>{const c=new AgendaCalendarComponent();c.month='2026-12';const month=vi.spyOn(c.monthChange,'emit'),selected=vi.spyOn(c.selectedChange,'emit');c.navigate(1);expect(month).toHaveBeenLastCalledWith('2027-01');c.select('2027-01-04');expect(selected).toHaveBeenCalledWith('2027-01-04');c.key(new KeyboardEvent('keydown',{key:'ArrowLeft'}),'2027-01-01');expect(c.focusDate).toBe('2026-12-31');expect(c.month).toBe('2026-12');c.changeYear(2030);expect(c.month).toBe('2030-12');});
+  it('distingue ocupación no disponible de un día libre',()=>{const c=new AgendaCalendarComponent();c.limit=null;expect(c.label(c.today)).toContain('no disponible');c.limit=5;expect(c.label(c.today)).toContain('0 visitas activas');});
+});

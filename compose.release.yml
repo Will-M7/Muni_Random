@@ -1,0 +1,8 @@
+# Use only the images delivered with this release. Never rebuild on the server.
+services:
+  mysql:
+    image: ${MYSQL_IMAGE:?Cargue images.lock.env}
+  backend:
+    image: ${BACKEND_IMAGE:?Cargue images.lock.env}
+  frontend:
+    image: ${FRONTEND_IMAGE:?Cargue images.lock.env}

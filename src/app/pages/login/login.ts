@@ -79,12 +79,5 @@ export class LoginComponent implements OnInit {
     return 'No se pudo iniciar sesión.';
   }
 
-  private rutaInicio(session: Sesion | null): string {
-    const capabilities = session?.capacidades;
-    if (capabilities?.includes('ROLES_VER')) return '/admin';
-    if (capabilities?.includes('TAREAS_PROPIAS_VER')) return '/fiscalizador';
-    if (capabilities?.includes('EXPEDIENTE_VER')) return '/expedientes';
-    if (capabilities?.includes('SOLICITUD_VER')) return '/inicio';
-    return '/perfil';
-  }
+  private rutaInicio(session: Sesion | null): string { return this.authService.homeRoute(session); }
 }

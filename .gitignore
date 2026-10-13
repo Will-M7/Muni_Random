@@ -26,6 +26,7 @@ Thumbs.db
 logs/
 
 # Secretos / configuración local
+.local/
 .env
 .env.*
 !.env.example
@@ -65,3 +66,10 @@ backups-san-miguel/
 **/backups/
 **/*.sql.gz
 **/*.tar.gz
+
+__pycache__/
+*.py[cod]
+
+# Capturas internas de validación
+docs/validacion-integrada/
+docs/validacion-visual/

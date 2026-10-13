@@ -16,44 +16,86 @@
   position: relative;
 }
 
-/* ========================================================
-   CABECERA DE LA PÁGINA (HERO)
-   ======================================================== */
-.page-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 24px;
+/* Solo el listado: el formulario y el detalle conservan su fondo actual. */
+:host(app-expedientes),
+.expedientes-page:not(.form-page):not(.detail-page) {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .25), rgba(255, 255, 255, .25)),
+    url('/assets/imagenes/municipalidad-san-miguel.png');
+  background-size: cover;
+  background-position: top center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
-.head-titles {
+/* ========================================================
+   ENCABEZADO HERO UNIFICADO MUNICIPAL (REFERENCIA: FISCALIZADOR)
+   ======================================================== */
+.hero-row {
+  position: relative;
+  isolation: isolate;
+  min-height: 142px;
+  margin: 0 0 16px;
+  padding: 28px 30px;
+  border: 1px solid #d9e9dd;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #dfeee7;
+  box-shadow: 0 8px 24px #1b51300b;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.hero-row h1 {
+  font-size: clamp(2.2rem, 3.5vw, 3.2rem);
+  letter-spacing: -0.035em;
+  color: #083e30;
+  margin: 6px 0 0;
+  line-height: 1.1;
+  font-weight: 850;
 }
 
 .eyebrow {
-  color: #076b25;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  margin: 0 0 6px;
-}
-
-.head-titles h1 {
-  font-size: 34px;
-  font-weight: 900;
-  line-height: 1.1;
-  color: #0c2314;
-  letter-spacing: -0.6px;
   margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  font-size: 0.69rem;
+  font-weight: 800;
+  color: #a97722;
 }
 
-.head-desc {
-  font-size: 14px;
-  color: #4b5e52;
-  margin: 6px 0 0;
+.hero-row > div:first-child,
+.hero-title-card {
+  background: rgba(255, 255, 255, .92);
+  border-radius: 8px;
+  box-shadow: 0 0 0 10px rgba(255, 255, 255, .92);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.page-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .hero-row {
+    min-height: 0;
+    margin-top: 12px;
+    padding: 24px 18px;
+    align-items: stretch;
+  }
+  .hero-row h1 {
+    font-size: 2.1rem;
+  }
+  .page-actions-row {
+    justify-content: flex-start;
+  }
 }
 
 /* BOTONES DE CABECERA */
@@ -559,4 +601,8 @@
     justify-self: stretch;
     justify-content: center;
   }
+}
+
+.hero-row .eyebrow {
+  color: #805b1a;
 }

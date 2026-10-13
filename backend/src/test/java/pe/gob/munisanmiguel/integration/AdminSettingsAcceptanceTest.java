@@ -16,8 +16,10 @@ import java.util.Map;
 import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.junit.jupiter.api.condition.EnabledIfSystemProperty(named="municipal.integration", matches="true")
+@org.springframework.test.context.ContextConfiguration(initializers=IsolatedDatabaseInitializer.class)
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT)
-@TestPropertySource(properties={"spring.datasource.url=jdbc:mysql://localhost:3307/san_miguel_pruebas_v20?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=utf8","app.storage.path=target/admin-acceptance/solicitudes"})
+@TestPropertySource(properties={"spring.datasource.url=${municipal.test.jdbc-url}","app.storage.path=target/admin-acceptance/solicitudes"})
 class AdminSettingsAcceptanceTest {
     @Autowired TestRestTemplate http;
     @Autowired AppUserRepository users;

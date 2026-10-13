@@ -25,6 +25,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest({UsuarioController.class, AdminController.class, CatalogoController.class})
 @Import(SecurityConfig.class)
 class RoleSeparationAuthorizationTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean pe.gob.munisanmiguel.service.MunicipalAccessService municipalAccess;
+
     @Autowired MockMvc mvc;
     @MockitoBean UsuarioService usuarios;
     @MockitoBean RoleCapabilityService roleCapabilities;

@@ -21,6 +21,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest({ExpedienteFiscalizacionController.class,ProgramacionFiscalizacionController.class,FiscalizadorController.class})
 @Import(SecurityConfig.class)
 class ExpedienteAuthorizationTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean pe.gob.munisanmiguel.service.MunicipalAccessService municipalAccess;
+
     @Autowired MockMvc mvc;
     @MockitoBean ExpedienteFiscalizacionService service;
     @MockitoBean pe.gob.munisanmiguel.repository.ProgramacionFiscalizacionRepository programaciones;

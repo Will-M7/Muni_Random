@@ -15,7 +15,7 @@ class ExpedienteFiscalizacionServiceTest {
     private ExpedienteFiscalizacionService service(ExpedienteFiscalizacionRepository expedientes,
             ProgramacionFiscalizacionRepository programaciones,ExpedienteHistorialRepository historial,
             AppUserRepository users,FiscalizadorRepository fiscalizadores,SolicitudRepository solicitudes){
-        return new ExpedienteFiscalizacionService(expedientes,programaciones,mock(DiligenciaFiscalizacionRepository.class),historial,users,fiscalizadores,solicitudes,new ObjectMapper().findAndRegisterModules(),mock(DocumentoStorageService.class));
+        return new ExpedienteFiscalizacionService(expedientes,programaciones,mock(DiligenciaFiscalizacionRepository.class),historial,users,fiscalizadores,solicitudes,new ObjectMapper().findAndRegisterModules(),mock(DocumentoStorageService.class),mock(MunicipalAccessService.class));
     }
 
     @Test void reprogramarConservaLaVisitaAnteriorYEnlazaLaNueva(){
@@ -31,7 +31,7 @@ class ExpedienteFiscalizacionServiceTest {
         when(history.save(any())).thenAnswer(inv->inv.getArgument(0));when(history.findAllByExpedienteIdOrderByFechaHoraAscIdAsc(9L)).thenReturn(List.of());
         var svc=service(expedientes,programs,history,users,fiscalizadores,solicitudes);
         var nueva=svc.reprogramar(21L,new pe.gob.munisanmiguel.dto.ApiDtos.ReprogramarRequest(
-                LocalDate.of(2026,10,10),LocalTime.of(10,30),"Visita anterior vencida",null,TipoVisita.PROGRAMADA),"municipio");
+                LocalDate.now(ZoneId.of("America/Lima")).plusDays(2),LocalTime.of(10,30),"Visita anterior vencida",null,TipoVisita.PROGRAMADA),"municipio");
 
         assertEquals(EstadoProgramacion.REPROGRAMADA,anterior.getEstadoProgramacion());
         assertEquals(EstadoProgramacion.PROGRAMADA.name(),nueva.estado());

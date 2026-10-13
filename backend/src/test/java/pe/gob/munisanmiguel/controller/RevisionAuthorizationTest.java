@@ -17,6 +17,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(RevisionFiscalizacionController.class)
 @Import(SecurityConfig.class)
 class RevisionAuthorizationTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean pe.gob.munisanmiguel.service.MunicipalAccessService municipalAccess;
+
     @Autowired MockMvc mvc;
     @MockitoBean RevisionFiscalizacionService service;
     @MockitoBean JwtService jwt;

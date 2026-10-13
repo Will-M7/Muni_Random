@@ -1,0 +1,11 @@
+[Unit]
+Description=Respaldo cifrado de San Miguel (pausa temporal del servicio)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+WorkingDirectory=/opt/san-miguel/current
+ExecStart=/usr/bin/python3 /opt/san-miguel/current/ops/production.py backup --env /etc/san-miguel/production.env --directory /var/backups/san-miguel --passphrase-file /etc/san-miguel/secrets/backup_passphrase

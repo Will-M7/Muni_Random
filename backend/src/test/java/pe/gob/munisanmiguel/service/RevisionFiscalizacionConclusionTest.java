@@ -42,7 +42,7 @@ class RevisionFiscalizacionConclusionTest {
         programaciones=mock(ProgramacionFiscalizacionRepository.class); evidencias=mock(EvidenciaFiscalizacionRepository.class);
         fiscalizadores=mock(FiscalizadorRepository.class); storage=mock(FiscalizacionFileStorageService.class);
         service=new RevisionFiscalizacionService(revisions,aclaraciones,diligencias,expedientes,users,historial,programaciones,evidencias,
-                fiscalizadores,storage,new ObjectMapper());
+                fiscalizadores,storage,new ObjectMapper(),mock(MunicipalAccessService.class));
 
         expediente=new ExpedienteFiscalizacion(); expediente.setId(EXPEDIENTE_ID); expediente.setCodigo("FIS-2026-00041");
         expediente.setOrigen(OrigenFiscalizacion.INICIATIVA_MUNICIPAL); expediente.setObjetoFiscalizacion("Objeto sintético");

@@ -1,41 +1,42 @@
 <main class="expedientes-page">
-  <!-- CABECERA DE LA PÁGINA (HERO) -->
-  <header class="page-head">
-    <div class="head-titles">
+  <!-- CABECERA DE LA PÁGINA (HERO MUNICIPAL) -->
+  <header class="hero-row">
+    <div class="hero-title-card">
       <p class="eyebrow">MUNICIPALIDAD DISTRITAL DE SAN MIGUEL · GESTIÓN OPERATIVA</p>
       <h1>Fiscalizaciones</h1>
-      <p class="head-desc">Expedientes, administrados y visitas de fiscalización.</p>
-    </div>
-    <div class="head-actions">
-      <a *ngIf="puedeRevisar" class="btn-action-light" routerLink="/revisiones">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="btn-icon">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
-        </svg>
-        <span>Pendientes de revisión</span>
-      </a>
-
-      <button type="button" class="btn-action-light" (click)="cargar()" [disabled]="cargando">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="btn-icon">
-          <polyline points="23 4 23 10 17 10"/>
-          <polyline points="1 20 1 14 7 14"/>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
-        <span>Actualizar</span>
-      </button>
-
-      <a class="btn-action-primary" routerLink="/expedientes/nuevo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="btn-icon">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="8" x2="12" y2="16"/>
-          <line x1="8" y1="12" x2="16" y2="12"/>
-        </svg>
-        <span>Crear fiscalización</span>
-      </a>
     </div>
   </header>
+
+  <!-- ACCIONES DEBAJO DEL ENCABEZADO -->
+  <div class="page-actions-row">
+    <a *ngIf="puedeRevisar" class="btn-action-light" routerLink="/revisiones">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="btn-icon">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+      <span>Pendientes de revisión</span>
+    </a>
+
+    <button type="button" class="btn-action-light" (click)="cargar()" [disabled]="cargando">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#076b25" stroke-width="2" class="btn-icon">
+        <polyline points="23 4 23 10 17 10"/>
+        <polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      <span>Actualizar</span>
+    </button>
+
+    <a class="btn-action-primary" routerLink="/expedientes/nuevo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="btn-icon">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="16"/>
+        <line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      <span>Crear fiscalización</span>
+    </a>
+  </div>
 
   <!-- BARRA DE FILTROS FLOTANTE -->
   <section class="filters-card" aria-label="Filtros de expedientes">

@@ -1,0 +1,4 @@
+export const VISIT_COLORS=['#2563eb','#15803d','#c45f12','#7e22ce','#0e7490','#be185d','#475569','#9a7500'];
+export function visitKey(visit:{programacionId?:number;codigo:string;fecha?:string;hora:string}):string{return visit.programacionId!=null?`p:${visit.programacionId}`:`s:${visit.codigo}:${visit.fecha??''}:${visit.hora}`;}
+export function visitColor(number:number):string{return VISIT_COLORS[(Math.max(1,number)-1)%VISIT_COLORS.length];}
+export function visitPin(number:number,color:string):string{return `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44" aria-hidden="true"><path fill="${color}" stroke="#fff" stroke-width="2" d="M18 2C9.2 2 2 9.2 2 18c0 10.4 16 24 16 24s16-13.6 16-24C34 9.2 26.8 2 18 2Z"/><circle cx="18" cy="18" r="9" fill="#fff"/><text x="18" y="22" text-anchor="middle" fill="${color}" font-size="11" font-family="Arial" font-weight="700">${number}</text></svg>`;}

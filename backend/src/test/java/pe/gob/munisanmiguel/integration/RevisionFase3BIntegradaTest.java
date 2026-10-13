@@ -3,7 +3,6 @@ package pe.gob.munisanmiguel.integration;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assumptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -26,14 +25,16 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Real HTTP/JWT integration fixture. It intentionally leaves the expediente as development evidence. */
+@org.junit.jupiter.api.condition.EnabledIfSystemProperty(named="municipal.integration", matches="true")
+@org.springframework.test.context.ContextConfiguration(initializers=IsolatedDatabaseInitializer.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = {
-        "spring.datasource.url=jdbc:mysql://localhost:3307/san_miguel_pruebas_v20?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=utf8",
+        "spring.datasource.url=${municipal.test.jdbc-url}",
         "app.storage.diligencias-path=target/fase3b-integrada/diligencias",
         "app.storage.path=target/fase3b-integrada/solicitudes"
 })
 class RevisionFase3BIntegradaTest {
-    private static final String MARCA = "VALIDACION_REVISION_FASE3B_INTEGRADA";
+    private final String MARCA = "VALIDACION_REVISION_FASE3B_INTEGRADA_"+UUID.randomUUID().toString().substring(0,8);
     private static final ZoneId LIMA = ZoneId.of("America/Lima");
 
     @Autowired TestRestTemplate http;
@@ -54,6 +55,8 @@ class RevisionFase3BIntegradaTest {
     @Autowired FiscalizacionFileStorageService storage;
 
     private final List<String> cuentasTemporales = new ArrayList<>();
+    private final String ownerIdentity = "T-" + UUID.randomUUID().toString().substring(0, 8);
+    private final String otherIdentity = "T-" + UUID.randomUUID().toString().substring(0, 8);
     private String adminToken;
     private String municipioToken;
     private String fiscalToken;
@@ -61,12 +64,6 @@ class RevisionFase3BIntegradaTest {
 
     @Test
     void recorridoIntegradoConJwtRealDejaExpedienteCerradoYVerificable() throws Exception {
-        // The marker check prevents a rerun from creating a duplicate fixture.
-        boolean yaExiste = expedientes.findAll().stream().anyMatch(e ->
-                Objects.toString(e.getObservacionesIniciales(), "").contains(MARCA)
-                        || Objects.toString(e.getObjetoFiscalizacion(), "").contains(MARCA));
-        Assumptions.assumeFalse(yaExiste, "El fixture ya existe; no se crea un segundo expediente.");
-
         try {
             crearCuentasTemporales();
             adminToken = login("f3b_admin", passwordFor("f3b_admin"));
@@ -75,15 +72,15 @@ class RevisionFase3BIntegradaTest {
             otroFiscalToken = login("f3b_fiscal_ajeno", passwordFor("f3b_fiscal_ajeno"));
             assertStatus(call(HttpMethod.GET, "/api/revisiones/pendientes", null, null), HttpStatus.UNAUTHORIZED);
 
-            LocalDate fecha = LocalDate.now(LIMA).plusDays(20);
-            JsonNode expediente = body(call(HttpMethod.POST, "/api/expedientes", municipioToken, expedienteRequest("VALIDACION_REVISION_FASE3B_INTEGRADA")), HttpStatus.CREATED);
+            LocalDate fecha = LocalDate.now(LIMA);
+            JsonNode expediente = body(call(HttpMethod.POST, "/api/expedientes", municipioToken, expedienteRequest(MARCA)), HttpStatus.CREATED);
             String codigo = expediente.path("codigo").asText();
             Long expedienteId = expediente.path("id").asLong();
             assertTrue(expedienteId > 0);
             assertEquals("ABIERTO", expediente.path("estado").asText());
 
             JsonNode programacion1 = body(call(HttpMethod.POST, "/api/expedientes/" + codigo + "/programaciones", municipioToken,
-                    Map.of("fiscalizadorId", "FIS-001", "fecha", fecha.toString(), "hora", "10:00", "tipoVisita", "PROGRAMADA")), HttpStatus.CREATED);
+                    Map.of("fiscalizadorId", ownerIdentity, "fecha", fecha.toString(), "hora", "10:00", "tipoVisita", "PROGRAMADA")), HttpStatus.CREATED);
             long prog1 = programacion1.path("id").asLong();
             long dil1 = ejecutarDiligencia(prog1, "primera diligencia sintética", fiscalToken, otroFiscalToken);
             JsonNode acta1 = first(body(call(HttpMethod.GET, "/api/actas/expediente/" + codigo, municipioToken, null), HttpStatus.OK));
@@ -127,7 +124,7 @@ class RevisionFase3BIntegradaTest {
             JsonNode acta1Despues = body(call(HttpMethod.GET, "/api/actas/" + acta1Id, municipioToken, null), HttpStatus.OK);
             assertEquals(acta1Antes.path("contenido"), acta1Despues.path("contenido"));
             JsonNode espacio1 = body(call(HttpMethod.GET, "/api/fiscalizador/programaciones/" + prog1 + "/diligencia", fiscalToken, null), HttpStatus.OK);
-            assertEquals("Hechos sintéticos de primera visita para VALIDACION_REVISION_FASE3B_INTEGRADA", espacio1.path("hechosConstatados").asText());
+            assertEquals("Hechos sintéticos de primera diligencia sintética para "+MARCA, espacio1.path("hechosConstatados").asText());
             assertEquals(1, espacio1.path("evidencias").size());
 
             JsonNode retomada = body(call(HttpMethod.POST, "/api/revisiones/diligencias/" + dil1 + "/iniciar", municipioToken, null), HttpStatus.OK);
@@ -137,7 +134,7 @@ class RevisionFase3BIntegradaTest {
             assertStatus(call(HttpMethod.GET, "/api/revisiones/pendientes", adminToken, null), HttpStatus.FORBIDDEN);
             assertStatus(call(HttpMethod.POST, "/api/revisiones/" + rev1 + "/concluir", adminToken, conclusion("CONFORMIDAD", "x", null, false, false, null)), HttpStatus.FORBIDDEN);
             assertStatus(call(HttpMethod.POST, "/api/revisiones/" + rev1 + "/concluir", fiscalToken, conclusion("CONFORMIDAD", "x", null, false, false, null)), HttpStatus.FORBIDDEN);
-            assertStatus(call(HttpMethod.POST, "/api/revisiones/" + rev1 + "/seguimientos", fiscalToken, seguimiento(fecha.plusDays(4), "11:00")), HttpStatus.FORBIDDEN);
+            assertStatus(call(HttpMethod.POST, "/api/revisiones/" + rev1 + "/seguimientos", fiscalToken, seguimiento(fecha, "11:00")), HttpStatus.FORBIDDEN);
             assertStatus(call(HttpMethod.POST, "/api/fiscalizador/programaciones/" + prog1 + "/diligencia/iniciar", adminToken, Map.of()), HttpStatus.FORBIDDEN);
 
             JsonNode cierreRevision1 = body(call(HttpMethod.POST, "/api/revisiones/" + rev1 + "/concluir", municipioToken,
@@ -149,10 +146,10 @@ class RevisionFase3BIntegradaTest {
             assertEquals("EN_SEGUIMIENTO", body(call(HttpMethod.GET, "/api/expedientes/" + codigo, municipioToken, null), HttpStatus.OK).path("estado").asText());
 
             JsonNode seguimiento = body(call(HttpMethod.POST, "/api/revisiones/" + rev1 + "/seguimientos", municipioToken,
-                    seguimiento(fecha.plusDays(4), "11:00")), HttpStatus.OK);
+                    seguimiento(fecha, "11:00")), HttpStatus.OK);
             long prog2 = seguimiento.path("id").asLong();
             assertEquals(codigo, seguimiento.path("expedienteCodigo").asText());
-            assertEquals("VALIDACION_REVISION_FASE3B_INTEGRADA: verificar implementación de mejora", seguimiento.path("motivo").asText());
+            assertEquals(MARCA+": verificar implementación de mejora", seguimiento.path("motivo").asText());
             assertEquals(rev1, jdbc.queryForObject("SELECT revision_origen_id FROM programacion_fiscalizacion WHERE id=?", Long.class, prog2));
             assertStatus(call(HttpMethod.POST, "/api/revisiones/" + rev1 + "/seguimientos", municipioToken,
                     seguimiento(fecha.plusDays(5), "11:30")), HttpStatus.CONFLICT);
@@ -175,7 +172,7 @@ class RevisionFase3BIntegradaTest {
             assertEquals("CERRADO", expedienteCerrado.path("estado").asText());
             // Closed expedientes reject ordinary mutations and attempts to restart a completed review.
             assertStatus(call(HttpMethod.POST, "/api/expedientes/" + codigo + "/programaciones", municipioToken,
-                    Map.of("fiscalizadorId", "FIS-001", "fecha", fecha.plusDays(6).toString(), "hora", "12:00", "tipoVisita", "PROGRAMADA")), HttpStatus.CONFLICT);
+                    Map.of("fiscalizadorId", ownerIdentity, "fecha", fecha.plusDays(6).toString(), "hora", "12:00", "tipoVisita", "PROGRAMADA")), HttpStatus.CONFLICT);
             assertStatus(call(HttpMethod.POST, "/api/programaciones/" + prog2 + "/reprogramar", municipioToken,
                     Map.of("fecha", fecha.plusDays(7).toString(), "hora", "12:00", "motivo", "Prueba de bloqueo", "tipoVisita", "PROGRAMADA")), HttpStatus.CONFLICT);
             assertStatus(call(HttpMethod.POST, "/api/programaciones/" + prog2 + "/cancelar", municipioToken,
@@ -275,8 +272,8 @@ class RevisionFase3BIntegradaTest {
     private void crearCuentasTemporales() {
         createUser("f3b_admin", Rol.ADMIN_SISTEMA, "ADMIN_SISTEMA", null);
         createUser("f3b_municipio", Rol.MUNICIPIO, "MUNICIPIO", null);
-        createUser("f3b_fiscal_propietario", Rol.FISCALIZADOR, "FISCALIZADOR", "FIS-001");
-        createUser("f3b_fiscal_ajeno", Rol.FISCALIZADOR, "FISCALIZADOR", "FIS-002");
+        createUser("f3b_fiscal_propietario", Rol.FISCALIZADOR, "FISCALIZADOR", ownerIdentity);
+        createUser("f3b_fiscal_ajeno", Rol.FISCALIZADOR, "FISCALIZADOR", otherIdentity);
     }
 
     private final Map<String,String> passwordByUsername = new HashMap<>();
@@ -287,7 +284,11 @@ class RevisionFase3BIntegradaTest {
         AppUser user = new AppUser(); user.setUsername(full); user.setPasswordHash(encoder.encode(password));
         user.setDisplayName("Fixture técnico " + roleName); user.setCargo("Validación Fase 3B"); user.setRole(legacyRole);
         user.getRoles().add(roles.findByName(roleName).orElseThrow()); user.setActivo(true); user.setCreatedAt(LocalDateTime.now(LIMA));
-        if (fiscalizadorId != null) user.setFiscalizador(fiscalizadores.findById(fiscalizadorId).orElseThrow());
+        if (fiscalizadorId != null) {
+            var identity=new Fiscalizador();identity.setId(fiscalizadorId);identity.setCodigo(fiscalizadorId);
+            identity.setNombre(full);identity.setZona("Pruebas aisladas");identity.setTelefono("");identity.setActivo(true);identity.setMunicipioResponsable(users.findByUsernameIgnoreCase(cuentasTemporales.stream().filter(n->n.startsWith("f3b_municipio_")).findFirst().orElseThrow()).orElseThrow());
+            user.setFiscalizador(fiscalizadores.saveAndFlush(identity));
+        }
         users.saveAndFlush(user); cuentasTemporales.add(full); passwordByUsername.put(username, password);
     }
 
@@ -307,7 +308,7 @@ class RevisionFase3BIntegradaTest {
         m.put("plazoConclusion",plazo); if ("OTRA".equals(kind)) m.put("denominacionOtra","Conclusión sintética personalizada"); return m;
     }
     private Object seguimiento(LocalDate date, String time) {
-        return Map.of("fecha", date.toString(), "hora", time, "tipoVisita", "PROGRAMADA", "fiscalizadorId", "FIS-001",
+        return Map.of("fecha", date.toString(), "hora", time, "tipoVisita", "PROGRAMADA", "fiscalizadorId", ownerIdentity,
                 "motivo", MARCA + ": verificar implementación de mejora");
     }
     private Object expedienteRequest(String notes) {

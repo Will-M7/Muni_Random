@@ -104,6 +104,15 @@ class AltaFiscalizacionServiceTest {
         verify(f.storage,never()).storeEvidence(any(),anyBoolean());
     }
 
+    @Test void solicitudSinDependenciaConservaReferenciaYPermiteAlta(){
+        var f=new Fixture();var original=f.request(null);var request=new CrearFiscalizacionRequest(original.expediente(),null,"REF-2026",null);
+        assertSame(f.response,f.service.crear(request,List.of(),"municipio"));
+        assertNull(f.expediente.getDependenciaProcedencia());assertEquals("REF-2026",f.expediente.getReferenciaSolicitud());
+    }
+    @Test void solicitudSigueExigiendoReferencia(){
+        var f=new Fixture();var original=f.request(null);
+        assertThrows(ConflictException.class,()->f.service.crear(new CrearFiscalizacionRequest(original.expediente(),null,null,null),List.of(),"municipio"));
+    }
     private static class Fixture {
         final ExpedienteFiscalizacionService expedientes=mock(ExpedienteFiscalizacionService.class);
         final ExpedienteFiscalizacionRepository repository=mock(ExpedienteFiscalizacionRepository.class);

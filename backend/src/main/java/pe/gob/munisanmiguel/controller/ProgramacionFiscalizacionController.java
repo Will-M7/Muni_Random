@@ -14,17 +14,18 @@ import pe.gob.munisanmiguel.repository.ProgramacionFiscalizacionRepository;
 
 @RestController @RequestMapping("/api/programaciones")
 public class ProgramacionFiscalizacionController {
+    private final pe.gob.munisanmiguel.service.MunicipalAccessService access;
     private final ExpedienteFiscalizacionService service;
     private final ProgramacionFiscalizacionRepository programaciones;
     private final pe.gob.munisanmiguel.service.AdminSettingsService settings;
     private final pe.gob.munisanmiguel.service.RevisionFiscalizacionService revisiones;
-    public ProgramacionFiscalizacionController(ExpedienteFiscalizacionService service,ProgramacionFiscalizacionRepository programaciones,pe.gob.munisanmiguel.service.AdminSettingsService settings,pe.gob.munisanmiguel.service.RevisionFiscalizacionService revisiones){this.service=service;this.programaciones=programaciones;this.settings=settings;this.revisiones=revisiones;}
+    public ProgramacionFiscalizacionController(ExpedienteFiscalizacionService service,ProgramacionFiscalizacionRepository programaciones,pe.gob.munisanmiguel.service.AdminSettingsService settings,pe.gob.munisanmiguel.service.RevisionFiscalizacionService revisiones,pe.gob.munisanmiguel.service.MunicipalAccessService access){this.service=service;this.programaciones=programaciones;this.settings=settings;this.revisiones=revisiones;this.access=access;}
 
     public record AgendaVisita(String fiscalizadorId,String fiscalizadorNombre,LocalTime hora,String expedienteCodigo,String estado,String origen){}
     @GetMapping("/agenda") @PreAuthorize("hasAuthority('PROGRAMACION_VER')")
     @org.springframework.transaction.annotation.Transactional(readOnly=true)
     public List<AgendaVisita> agenda(@RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate fecha){
-        return programaciones.findAllByFechaOrderByHoraAscIdAsc(fecha).stream().map(p->
+        var actor=access.current();return programaciones.findAllByFechaOrderByHoraAscIdAsc(fecha).stream().filter(p->access.agendaVisible(p,actor)).map(p->
             new AgendaVisita(p.getFiscalizador()==null?null:p.getFiscalizador().getId(),
                 p.getFiscalizador()==null?"Sin fiscalizador":p.getFiscalizador().getNombre(),p.getHora(),
                 p.getExpediente().getCodigo(),p.getEstadoProgramacion().name(),p.getExpediente().getOrigen().name())).toList();
@@ -40,7 +41,7 @@ public class ProgramacionFiscalizacionController {
             boolean origenOk=origen==null||origen.isBlank()||origen.equals(row.get("origen"));
             if(inspectorOk&&origenOk&&value instanceof LocalDate date)pendientesRevision.merge(date,1L,Long::sum);
         }
-        var grouped=programaciones.findAll().stream().filter(p->p.getFecha()!=null)
+        var actor=access.current();var grouped=programaciones.findAll().stream().filter(p->p.getFecha()!=null).filter(p->access.agendaVisible(p,actor))
                 .filter(p->p.getEstadoProgramacion()!=pe.gob.munisanmiguel.entity.EstadoProgramacion.CANCELADA&&p.getEstadoProgramacion()!=pe.gob.munisanmiguel.entity.EstadoProgramacion.REPROGRAMADA)
                 .filter(p->fiscalizador==null||fiscalizador.isBlank()||(p.getFiscalizador()!=null&&fiscalizador.equals(p.getFiscalizador().getNombre())))
                 .filter(p->origen==null||origen.isBlank()||origen.equals(p.getExpediente().getOrigen().name()))
@@ -50,8 +51,8 @@ public class ProgramacionFiscalizacionController {
             var list=entry.getValue();long completed=list.stream().filter(p->p.getEstadoProgramacion()==pe.gob.munisanmiguel.entity.EstadoProgramacion.REALIZADA).count();
             long pending=list.stream().filter(p->p.getEstadoProgramacion()==pe.gob.munisanmiguel.entity.EstadoProgramacion.PROGRAMADA).count();
             var byInspector=list.stream().collect(java.util.stream.Collectors.groupingBy(p->p.getFiscalizador()==null?"Sin fiscalizador":p.getFiscalizador().getNombre(),java.util.stream.Collectors.counting()));
-            String color=list.size()>limit?"rojo":list.size()>=0.8*limit?"amarillo":"verde";
-            return new DailySummary(entry.getKey(),pending,completed,pendientesRevision.getOrDefault(entry.getKey(),0L),list.size(),limit,color,byInspector);
+            long carga=list.stream().filter(p->MunicipalAgendaController.occupies(p.getEstadoProgramacion())).count();String color=MunicipalAgendaController.color(carga,limit);
+            return new DailySummary(entry.getKey(),pending,completed,pendientesRevision.getOrDefault(entry.getKey(),0L),carga,limit,color,byInspector);
         }).toList();
     }
 

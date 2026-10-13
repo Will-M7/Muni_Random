@@ -27,19 +27,20 @@ public class ExpedienteFiscalizacionService {
     private final SolicitudRepository solicitudes;
     private final ObjectMapper json;
     private final DocumentoStorageService documentos;
+    private final MunicipalAccessService access;
 
     public ExpedienteFiscalizacionService(ExpedienteFiscalizacionRepository expedientes,
             ProgramacionFiscalizacionRepository programaciones, DiligenciaFiscalizacionRepository diligencias,
             ExpedienteHistorialRepository historial,
             AppUserRepository users, FiscalizadorRepository fiscalizadores, SolicitudRepository solicitudes,
-            ObjectMapper json, DocumentoStorageService documentos) {
+            ObjectMapper json, DocumentoStorageService documentos,MunicipalAccessService access) {
         this.expedientes=expedientes; this.programaciones=programaciones; this.diligencias=diligencias; this.historial=historial;
-        this.users=users; this.fiscalizadores=fiscalizadores; this.solicitudes=solicitudes; this.json=json; this.documentos=documentos;
+        this.users=users; this.fiscalizadores=fiscalizadores; this.solicitudes=solicitudes; this.json=json; this.documentos=documentos;this.access=access;
     }
 
     @Transactional
     public List<ExpedienteResponse> listar() {
-        return expedientes.findAllByOrderByFechaCreacionDescIdDesc().stream().map(this::response).toList();
+        var actor=access.current();return expedientes.findAllByOrderByFechaCreacionDescIdDesc().stream().filter(e->access.canRead(e,actor)).map(this::response).toList();
     }
 
     @Transactional
@@ -105,7 +106,7 @@ public class ExpedienteFiscalizacionService {
         var e=entidad(codigo);asegurarNoCerrado(e); var actor=usuario(username);
         var p=new ProgramacionFiscalizacion(); p.setExpediente(e); p.setTipoVisita(r.tipoVisita());
         p.setFecha(r.fecha());p.setHora(r.hora());p.setEstadoProgramacion(EstadoProgramacion.PROGRAMADA);
-        p.setFechaCreacion(LocalDateTime.now(LIMA));p.setCreadaPor(actor);p.setFiscalizador(fiscalizador(r.fiscalizadorId()));
+        p.setFechaCreacion(LocalDateTime.now(LIMA));p.setCreadaPor(actor);p.setFiscalizador(fiscalizador(r.fiscalizadorId()));access.requireAssignment(actor,p.getFiscalizador());
         validarDisponibilidad(p.getFiscalizador(),p.getFecha(),p.getHora()); programaciones.save(p);
         copiarProgramacionALegacy(e,p);
         evento(e,p,"PROGRAMACION_CREADA","Visita programada",null,map("fecha",p.getFecha(),"hora",p.getHora(),"estado",p.getEstadoProgramacion().name()),username);
@@ -125,7 +126,7 @@ public class ExpedienteFiscalizacionService {
         var nueva=new ProgramacionFiscalizacion();nueva.setExpediente(anterior.getExpediente());nueva.setFiscalizador(fiscalizador(r.fiscalizadorId()==null?anterior.getFiscalizador()==null?null:anterior.getFiscalizador().getId():r.fiscalizadorId()));
         nueva.setFecha(r.fecha());nueva.setHora(r.hora());nueva.setTipoVisita(r.tipoVisita());nueva.setEstadoProgramacion(EstadoProgramacion.PROGRAMADA);
         nueva.setCreadaPor(actor);nueva.setFechaCreacion(LocalDateTime.now(LIMA));nueva.setMotivoReprogramacion(r.motivo().trim());nueva.setProgramacionAnterior(anterior);
-        validarDisponibilidad(nueva.getFiscalizador(),nueva.getFecha(),nueva.getHora());programaciones.save(nueva);
+        access.requireAssignment(usuario(username),nueva.getFiscalizador());validarDisponibilidad(nueva.getFiscalizador(),nueva.getFecha(),nueva.getHora());programaciones.save(nueva);
         copiarProgramacionALegacy(nueva.getExpediente(),nueva);
         evento(nueva.getExpediente(),anterior,"PROGRAMACION_REPROGRAMADA","Programación sustituida: "+r.motivo().trim(),old,map("estado","REPROGRAMADA","nuevaProgramacionId",nueva.getId()),username);
         evento(nueva.getExpediente(),nueva,"PROGRAMACION_CREADA_POR_REPROGRAMACION","Nueva visita programada",null,map("fecha",nueva.getFecha(),"hora",nueva.getHora(),"estado","PROGRAMADA","programacionAnteriorId",anterior.getId()),username);
@@ -324,6 +325,8 @@ public class ExpedienteFiscalizacionService {
     private AppUser usuarioNullable(String username){return username==null||username.isBlank()?null:users.findByUsernameIgnoreCaseAndActivoTrue(username).orElse(null);}
 
     private void validarDisponibilidad(Fiscalizador f,LocalDate fecha,LocalTime hora){
+        if(f!=null)fiscalizadores.findForIdentityLink(f.getId()); // Serialize assignment checks for the same inspector.
+
         if(f!=null&&!f.isActivo())throw new ConflictException("El fiscalizador está inactivo.");
         if(f!=null&&programaciones.existsByFiscalizadorIdAndFechaAndHoraAndEstadoProgramacionIn(f.getId(),fecha,hora,List.of(EstadoProgramacion.PROGRAMADA,EstadoProgramacion.EN_CURSO)))
             throw new ConflictException("El fiscalizador ya tiene una visita programada para esa fecha y hora.");

@@ -70,4 +70,13 @@ class UsuarioGestionTest {
         assertTrue(user.getRoles().contains(adminRole));
     }
 
+    @Test void responsableMunicipalDebeReasignarFiscalizadoresAntesDeRetirarRol(){
+        var users=mock(AppUserRepository.class);var u=new AppUser();u.setId(40L);u.setUsername("responsable");u.setDisplayName("Responsable");u.setRole(Rol.MUNICIPIO);
+        var role=new AppRole();role.setName("MUNICIPIO");u.getRoles().add(role);when(users.findByUsernameIgnoreCase("responsable")).thenReturn(Optional.of(u));
+        var directory=mock(FiscalizadorRepository.class);when(directory.existsByMunicipioResponsableId(40L)).thenReturn(true);
+        var svc=service(users,directory,mock(UserPreferenceRepository.class),mock(UserHistoryService.class),mock(AppRoleRepository.class),mock(PasswordEncoder.class));
+        assertThrows(ConflictException.class,()->svc.editar("responsable",new UsuarioEdicionRequest("responsable","Responsable",null,Rol.FISCALIZADOR)));
+        assertThrows(ConflictException.class,()->svc.asignarRoles("responsable",List.of("FISCALIZADOR"),null));assertEquals(Rol.MUNICIPIO,u.getRole());assertNull(u.getFiscalizador());
+    }
+
 }

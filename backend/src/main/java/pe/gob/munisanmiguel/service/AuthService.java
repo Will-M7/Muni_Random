@@ -9,6 +9,7 @@ import pe.gob.munisanmiguel.dto.ApiDtos.*; import pe.gob.munisanmiguel.exception
         var identifier = request.identifier();
         if (identifier == null || identifier.isBlank()) throw new InvalidCredentialsException();
         var user = users.findByUsernameIgnoreCaseAndActivoTrue(identifier.trim()).orElseThrow(InvalidCredentialsException::new);
+        if (!user.hasCompatibleIdentity()) throw new InvalidCredentialsException();
         if (!encoder.matches(request.password(), user.getPasswordHash())) throw new InvalidCredentialsException();
         var roles = user.getRoles().stream().map(r -> r.getName()).sorted().toList();
         if (request.rol()!=null && !request.rol().isBlank() && !roles.stream().anyMatch(r -> r.equalsIgnoreCase(request.rol()))) throw new InvalidCredentialsException();

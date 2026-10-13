@@ -14,7 +14,7 @@ describe('AdminComponent ajustes individuales', () => {
 
   beforeEach(async () => {
     service = {
-      listar: vi.fn().mockResolvedValue(users), integracion: vi.fn().mockResolvedValue({ provider: 'DISABLED', endpoint: null, credentialConfigured: false, actualizadoPor: null, actualizadoEn: null }),
+      municipalesGestion:vi.fn().mockResolvedValue([users[0]]), gestionFiscalizadores:vi.fn().mockResolvedValue([]),asignarResponsableMunicipal:vi.fn(), listar: vi.fn().mockResolvedValue(users), integracion: vi.fn().mockResolvedValue({ provider: 'DISABLED', endpoint: null, credentialConfigured: false, actualizadoPor: null, actualizadoEn: null }),
       limiteDiario: vi.fn().mockResolvedValue(5), probarDni: vi.fn().mockResolvedValue({ dni: '00000000', nombres: 'FICTICIO', apellidoPaterno: 'PRUEBA', apellidoMaterno: '', provider: 'PERUAPI_COM', message: 'Consulta realizada correctamente.' }), preferencias: vi.fn(async (username: string) => username === 'municipio1'
         ? { mapaInterno: false, googleExterno: true, googleUrl: false, descargarJornadaHtml: true }
         : { mapaInterno: true, googleExterno: false, googleUrl: true, descargarJornadaHtml: false }),

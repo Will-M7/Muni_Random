@@ -1,0 +1,15 @@
+/* El diseño base histórico se conserva en expedientes.css y expedientes-extra.css.
+   Aquí solo quedan los estilos de controles actuales y ajustes de contención. */
+.form-sections{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0}.form-sections button{color:#16553d;background:#fff;border:1px solid #d6e2d8;border-radius:999px;padding:9px 15px;text-decoration:none;font-weight:650;font-size:.9rem}.form-section{scroll-margin-top:90px}.field-error{display:block;color:#a02828!important;font-size:.83rem;font-weight:500}.configuration-state{background:#fff5dc;border:1px solid #e6d3a4;color:#604b20;padding:16px;border-radius:14px;margin:15px 0;line-height:1.6}.configuration-state a{margin-left:16px;color:#16553d}.schedule-content{margin-top:22px}.schedule-fields{margin-bottom:24px}.selected-agenda{margin-top:22px}.agenda-row{display:grid;grid-template-columns:160px 1fr;gap:15px;border:1px solid #e1e8e1;border-radius:14px;padding:17px;margin:10px 0;background:#fff}.agenda-row time{font-size:.9rem;color:#38624c}.agenda-row div{display:flex;flex-direction:column;gap:6px}.agenda-row a{color:#166344;font-weight:700}.capacity-warning{background:#fff3d0;padding:14px;border-radius:12px;color:#674d16}.dni-group{min-width:0}.dni-group .inline-field{flex-wrap:wrap}.google-paste{min-width:0}.google-paste input{box-sizing:border-box;width:100%}@media(max-width:680px){.agenda-row{grid-template-columns:1fr}.form-sections{gap:7px}.form-sections button{padding:8px 11px}}
+
+.expediente-form{min-width:0;width:100%}.form-section{min-width:0;box-sizing:border-box;width:auto}.form-grid>*,.form-grid label{min-width:0;white-space:normal}.form-actions{min-width:0}.form-actions .btn-primary,.form-actions .btn-light{min-width:0;box-sizing:border-box}.form-sections button{font-family:inherit;cursor:pointer}
+
+:host,.expedientes-page.form-page{background:linear-gradient(rgba(255,255,255,.25),rgba(255,255,255,.25)),url('/assets/imagenes/municipalidad-san-miguel.png') top center/cover no-repeat fixed}
+.form-page .hero-row { max-width: 1500px; margin: 0 auto 16px; }
+.form-back-row { max-width: 1500px; margin: 0 auto 20px; display: flex; align-items: center; }
+.form-back-row .back { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 8px 16px; border: 1.5px solid #d1d9d3; border-radius: 8px; background: #ffffff; color: #173620; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.04); transition: all .15s; }
+.form-back-row .back:hover { background: #f7faf8; border-color: #076b25; color: #076b25; }
+.form-back-row .back svg { width: 16px; height: 16px; flex: none; }
+.schedule-content app-agenda-calendar{width:85%;max-width:100%;margin-inline:auto;--agenda-padding:19px;--agenda-gap:7px;--agenda-day-height:78px;--agenda-controls-margin:15px;--agenda-legend-margin:17px;--agenda-mobile-padding:10px;--agenda-mobile-day-height:56px}
+.form-grid.schedule-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:680px){.schedule-content app-agenda-calendar{width:100%}.form-grid.schedule-fields{grid-template-columns:1fr}}

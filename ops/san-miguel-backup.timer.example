@@ -1,0 +1,10 @@
+[Unit]
+Description=Programación propuesta de respaldo San Miguel (confirmar horario y retención)
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 America/Lima
+Persistent=true
+Unit=san-miguel-backup.service
+
+[Install]
+WantedBy=timers.target

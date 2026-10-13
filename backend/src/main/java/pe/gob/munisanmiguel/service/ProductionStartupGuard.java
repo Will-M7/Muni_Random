@@ -27,10 +27,24 @@ public class ProductionStartupGuard implements ApplicationRunner {
     @Override public void run(ApplicationArguments args) {
         if(jwtSecret.length()<48||jwtSecret.startsWith("change-this-secret")
                 ||adminUsername.isBlank()||adminPassword.length()<16||databasePassword.length()<16
-                ||!corsOrigins.startsWith("https://")||corsOrigins.contains("localhost:4200"))
+                ||!validOrigins(corsOrigins))
             throw new IllegalStateException("Configuración de seguridad de producción incompleta o débil.");
         try {if(Base64.getDecoder().decode(masterKey).length!=32)throw new IllegalArgumentException();}
         catch(IllegalArgumentException e){throw new IllegalStateException("IDENTITY_MASTER_KEY de producción inválida.");}
 
+    }
+
+    private static boolean validOrigins(String origins) {
+        if(origins==null||origins.isBlank())return false;
+        for(String value:origins.split(",",-1)) {
+            try {
+                var uri=java.net.URI.create(value.trim());
+                if(!"https".equalsIgnoreCase(uri.getScheme())||uri.getHost()==null
+                        ||uri.getRawUserInfo()!=null||uri.getRawQuery()!=null||uri.getRawFragment()!=null
+                        ||(uri.getRawPath()!=null&&!uri.getRawPath().isEmpty())
+                        ||uri.getPort()==0||uri.getPort()>65535)return false;
+            } catch(IllegalArgumentException e) { return false; }
+        }
+        return true;
     }
 }

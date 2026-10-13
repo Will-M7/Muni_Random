@@ -23,6 +23,7 @@ public class SecurityConfig {
     @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
     @Bean UserDetailsService userDetailsService(AppUserRepository users) {
         return username -> users.findByUsernameIgnoreCaseAndActivoTrue(username)
+                .filter(pe.gob.munisanmiguel.entity.AppUser::hasCompatibleIdentity)
                 .map(u -> User.withUsername(u.getUsername()).password(u.getPasswordHash()).authorities(
                         u.getRoles().stream().flatMap(r -> r.getCapabilities().stream())
                                 .map(c -> new org.springframework.security.core.authority.SimpleGrantedAuthority(c.getCode())).distinct().toList()).build())

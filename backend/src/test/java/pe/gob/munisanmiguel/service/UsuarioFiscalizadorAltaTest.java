@@ -63,7 +63,7 @@ class UsuarioFiscalizadorAltaTest {
         var existing=new Fiscalizador();existing.setId("FIS-001");existing.setActivo(true);
         when(roles.findByName("FISCALIZADOR")).thenReturn(Optional.of(role));
         when(users.saveAndFlush(any())).thenAnswer(i->{AppUser u=i.getArgument(0);u.setId(43L);return u;});
-        when(fiscalizadores.findById("FIS-001")).thenReturn(Optional.of(existing));
+        when(fiscalizadores.findForIdentityLink("FIS-001")).thenReturn(Optional.of(existing));
         service(users,encoder,roles,fiscalizadores,mock(AdminSettingsService.class)).crear(
                 new UsuarioRequest("inspector2","Inspector dos","12345678","12345678",Rol.FISCALIZADOR,"FIS-001"));
         verify(fiscalizadores,never()).save(any());
@@ -82,6 +82,17 @@ class UsuarioFiscalizadorAltaTest {
         assertThrows(ConflictException.class,()->service.crear(
                 new UsuarioRequest("inspector3","Inspector de prueba","12345678","12345678",Rol.FISCALIZADOR,null)));
         verify(fiscalizadores,never()).save(any());
+    }
+
+    @Test void cuentaFiscalizadoraHeredadaExigeDecisionExplicitaEnRolesYEdicion(){
+        var users=mock(AppUserRepository.class);var roles=mock(AppRoleRepository.class);var directory=mock(FiscalizadorRepository.class);
+        var u=new AppUser();u.setId(8L);u.setUsername("pendiente");u.setDisplayName("Identidad pendiente");u.setRole(Rol.FISCALIZADOR);
+        var role=new AppRole();role.setName("FISCALIZADOR");u.getRoles().add(role);
+        when(users.findByUsernameIgnoreCase("pendiente")).thenReturn(Optional.of(u));when(roles.findAll()).thenReturn(List.of(role));
+        var svc=service(users,mock(PasswordEncoder.class),roles,directory,mock(AdminSettingsService.class));
+        assertThrows(ConflictException.class,()->svc.asignarRoles("pendiente",List.of("FISCALIZADOR"),null));
+        assertThrows(ConflictException.class,()->svc.editar("pendiente",new pe.gob.munisanmiguel.dto.ApiDtos.UsuarioEdicionRequest("pendiente","Identidad pendiente",null,Rol.FISCALIZADOR)));
+        assertNull(u.getFiscalizador());verifyNoInteractions(directory);
     }
 
     private UsuarioService service(AppUserRepository users,PasswordEncoder encoder,AppRoleRepository roles,FiscalizadorRepository fiscalizadores,AdminSettingsService settings){
